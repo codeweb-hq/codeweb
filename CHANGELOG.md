@@ -9,6 +9,13 @@ notes so validated results, papers, and new tools never get lost in commit histo
 
 ## [Unreleased]
 
+_Nothing yet. Open work lands here before it ships in the next tagged release._
+
+## [0.16.1] - 2026-10-31
+
+### Changed
+- The repository moved to the `codeweb-hq` organization. The MCP registry name is now `io.github.codeweb-hq/codeweb`, and the docs site is at `https://codeweb-hq.github.io/codeweb/`.
+
 ### Fixed
 - Map Python `async def` functions and methods. The symbol rule only matched `def`, so no async function became a node and calls into one were dropped or wired to a same-named function elsewhere (issue #104). `SCANNER_VERSION` is now 25, so existing caches rebuild.
 
@@ -2013,7 +2020,8 @@ The deterministic engine and its evidence base.
   ~490k oracle comparisons; the study found and fixed two real engine bugs the 286-test
   suite had missed (`paper/`).
 
-[Unreleased]: https://github.com/GhostlyGawd/codeweb/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/GhostlyGawd/codeweb/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/GhostlyGawd/codeweb/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.13.0...v0.14.0
