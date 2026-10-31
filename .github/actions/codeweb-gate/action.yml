@@ -53,8 +53,8 @@ runs:
       env:
         CODEWEB_REF: ${{ inputs.codeweb-ref }}
       run: |
-        if ! git clone --depth 1 --branch "$CODEWEB_REF" https://github.com/GhostlyGawd/codeweb.git "$RUNNER_TEMP/codeweb" 2>/dev/null; then
-          git clone https://github.com/GhostlyGawd/codeweb.git "$RUNNER_TEMP/codeweb"
+        if ! git clone --depth 1 --branch "$CODEWEB_REF" https://github.com/codeweb-hq/codeweb.git "$RUNNER_TEMP/codeweb" 2>/dev/null; then
+          git clone https://github.com/codeweb-hq/codeweb.git "$RUNNER_TEMP/codeweb"
           git -C "$RUNNER_TEMP/codeweb" checkout --quiet "$CODEWEB_REF"
         fi
     - name: Restore gate history

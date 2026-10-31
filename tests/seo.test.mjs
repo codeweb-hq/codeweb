@@ -136,7 +136,7 @@ test('F2: server.json exists for the MCP registry and tracks the package version
   const pkg = readJSON(join(PLUGIN_ROOT, 'package.json'));
   // Canonical namespace casing matches the owner's existing registry listing and the
   // Actions-OIDC identity the mcp-registry workflow authenticates with.
-  assert.equal(server.name, 'io.github.GhostlyGawd/codeweb');
+  assert.equal(server.name, 'io.github.codeweb-hq/codeweb');
   assert.equal(server.version, pkg.version, 'version stays in lock-step with the package');
   assert.ok(JSON.stringify(server).includes('@ghostlygawd/codeweb'), 'points at the npm package');
   assert.equal(pkg.mcpName, server.name, 'the npm package carries the registry ownership handshake');

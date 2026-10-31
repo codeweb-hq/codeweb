@@ -1,7 +1,7 @@
 {
   "name": "@ghostlygawd/codeweb",
   "version": "0.16.0",
-  "mcpName": "io.github.GhostlyGawd/codeweb",
+  "mcpName": "io.github.codeweb-hq/codeweb",
   "type": "module",
   "description": "See what your AI edits affect. Structural checks for AI code changes. Local call/import graphs and 28 MCP tools for impact, callers, and duplication. No LLM in the checks.",
   "keywords": [
@@ -25,7 +25,7 @@
   "homepage": "https://codeweb-hq.github.io/codeweb/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GhostlyGawd/codeweb.git"
+    "url": "https://github.com/codeweb-hq/codeweb.git"
   },
   "license": "MIT",
   "bin": {
