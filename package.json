@@ -1,9 +1,9 @@
 {
   "name": "@ghostlygawd/codeweb",
-  "version": "0.12.0",
-  "mcpName": "io.github.GhostlyGawd/codeweb",
+  "version": "0.16.0",
+  "mcpName": "io.github.codeweb-hq/codeweb",
   "type": "module",
-  "description": "Your agents break less code and burn fewer tokens. codeweb maps your repo into a deterministic call/import graph; 27 MCP tools answer impact, callers, and duplication before agents write. Claude Code plugin & MCP server; zero deps, runs 100% locally.",
+  "description": "See what your AI edits affect. Structural checks for AI code changes. Local call/import graphs and 28 MCP tools for impact, callers, and duplication. No LLM in the checks.",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -22,10 +22,10 @@
     "duplication",
     "refactoring"
   ],
-  "homepage": "https://ghostlygawd.github.io/codeweb/",
+  "homepage": "https://codeweb-hq.github.io/codeweb/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GhostlyGawd/codeweb.git"
+    "url": "https://github.com/codeweb-hq/codeweb.git"
   },
   "license": "MIT",
   "bin": {
@@ -37,15 +37,22 @@
   "files": [
     "bin",
     "scripts",
+    "!scripts/product-demo.mjs",
+    "!scripts/refresh-demo.mjs",
+    "!scripts/verify-product-ui.mjs",
     "!scripts/check",
     "!scripts/spec_lint.py",
     "!scripts/hook-check",
     "!scripts/hook-protect",
+    "!scripts/**/__pycache__/**",
+    "!scripts/**/*.pyc",
     "hooks",
     "skills",
     "agents",
     "commands",
     ".claude-plugin",
+    ".codex-plugin",
+    ".mcp.json",
     "CHANGELOG.md",
     "LICENSE",
     "SECURITY.md"

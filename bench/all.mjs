@@ -6,7 +6,14 @@
 // removed 2026-07-27, operator-ruled: it was write-only — nothing on the site ever read it.)
 //
 //   node bench/all.mjs [--target <dir>] [--ws <dir>] [--corpus <dir>] [--budgets <file>]
-//                      [--out <file>] [--gate]
+//                      [--out <file>] [--gate] [--check]
+//
+// --check = --gate WITHOUT the write: every promise is still measured and enforced, but
+// benchmarks.json is left alone. Every run records fresh wall-clock timings, so a verification
+// re-run of a plain `--gate` leaves the tracked receipt modified and the tree dirty — which either
+// gets committed as timing noise or discarded by hand, and both are how a stale receipt slips
+// through. Use --check when the question is "do the promises still hold", --gate when the intent is
+// to publish new numbers.
 //
 // Sections: pipeline (cold map + no-change rerun + regex extraction baseline), session (a
 // representative 12-call MCP session — bytes, ≈tokens, JSON validity), toolBudgets (max response
@@ -20,7 +27,7 @@ import { tmpdir } from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
-const opt = { target: ROOT, ws: null, corpus: join(ROOT, 'bench', 'corpus', 'axios'), budgets: join(ROOT, 'bench', 'budgets.json'), out: join(ROOT, 'bench', 'results', 'benchmarks.json'), gate: false };
+const opt = { target: ROOT, ws: null, corpus: join(ROOT, 'bench', 'corpus', 'axios'), budgets: join(ROOT, 'bench', 'budgets.json'), out: join(ROOT, 'bench', 'results', 'benchmarks.json'), gate: false, check: false };
 for (let i = 0; i < argv.length; i++) {
   const t = argv[i];
   if (t === '--target') opt.target = resolve(argv[++i]);
@@ -29,6 +36,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (t === '--budgets') opt.budgets = resolve(argv[++i]);
   else if (t === '--out') opt.out = resolve(argv[++i]);
   else if (t === '--gate') opt.gate = true;
+  else if (t === '--check') { opt.check = true; opt.gate = true; }
 }
 const ws = opt.ws || mkdtempSync(join(tmpdir(), 'codeweb-benchws-'));
 const budgets = JSON.parse(readFileSync(opt.budgets, 'utf8'));
@@ -54,7 +62,25 @@ const graph = JSON.parse(readFileSync(join(ws, 'graph.json'), 'utf8'));
 // noise; on tiny fixture targets both terms are ~100ms of node spawns and the ratio is jitter
 // (a CI runner measured 2.17x on a two-file fixture). Below the floor it reports null with the
 // reason, and the gate skips it — explicitly, never silently.
+//
+// The floor is applied to the baseline's WORK component (wall time minus this machine's own
+// process-startup cost), not to its raw wall time. A raw-ms floor conflates "the target is big
+// enough to measure" with "this machine is slow": on a shared windows runner a node spawn alone
+// costs ~300ms, so a two-file fixture cleared a raw 300ms floor on startup overhead alone and
+// repo-scale stage budgets were then applied to a 3-symbol graph — reporting jitter as
+// `stage optimize: 1.29x regex baseline > 1.2x`. Subtracting the measured spawn cost makes the
+// predicate mean what its comment always said, and cancels machine speed instead of encoding it.
 const BASELINE_FLOOR_MS = 300;
+// Median of a few bare `node -e ''` spawns: the irreducible cost every timed sample here pays.
+const spawnFloorMs = (() => {
+  const s = [];
+  for (let i = 0; i < 5; i++) {
+    const t0 = performance.now();
+    spawnSync(NODE, ['-e', ''], { encoding: 'utf8', env: ENV });
+    s.push(performance.now() - t0);
+  }
+  return Math.round(s.sort((a, b) => a - b)[Math.floor(s.length / 2)]);
+})();
 // finding 13(a): per-stage wall times from run.mjs's own `[run] <stage> done in Xms` stderr lines,
 // each gated as a factor of the regex-extract baseline. The previous only-timing-gate measured the
 // stage-REUSE path (which skips overlap/optimize entirely) — a 10x regression in any post-graph
@@ -65,17 +91,20 @@ const stageTimesOf = (stderr) => {
   return out;
 };
 const coldStages = stageTimesOf(cold.stderr);
-const measurable = regexBase.ms >= BASELINE_FLOOR_MS;
+const baselineWorkMs = Math.max(0, regexBase.ms - spawnFloorMs);
+const measurable = baselineWorkMs >= BASELINE_FLOOR_MS;
 const factorOf = (ms) => (measurable && ms != null ? +(ms / regexBase.ms).toFixed(2) : null);
 const pipeline = {
   target: opt.target === ROOT ? 'codeweb (self)' : opt.target,
   symbols: graph.nodes.length, edges: graph.edges.length,
   coldMs: cold.ms, warmMs: warm.ms, stagesReused,
   regexExtractBaselineMs: regexBase.ms,
+  spawnFloorMs,
+  baselineWorkMs,
   stageMs: coldStages,
   stageFactorsVsRegexBaseline: Object.fromEntries(Object.entries(coldStages).map(([k, v]) => [k, factorOf(v)])),
   warmFactorVsRegexBaseline: measurable ? +(warm.ms / regexBase.ms).toFixed(2) : null,
-  ...(measurable ? {} : { warmFactorNote: `target too small to measure (baseline ${regexBase.ms}ms < ${BASELINE_FLOOR_MS}ms floor) — the factor gates only at repo scale` }),
+  ...(measurable ? {} : { warmFactorNote: `target too small to measure (baseline ${regexBase.ms}ms − ${spawnFloorMs}ms spawn = ${baselineWorkMs}ms work < ${BASELINE_FLOOR_MS}ms floor) — the factor gates only at repo scale` }),
 };
 
 // ---------------------------------------------------------------- advisors (finding 13(c))
@@ -133,6 +162,19 @@ const session = {
   totalTokensApprox: calls.reduce((a, c) => a + c.tokensApprox, 0),
   allValidJson: calls.every((c) => c.ok) && lines.length >= CALLS.length + 1,
 };
+// AGT-F5 (PLAN finding 22): tools/list loads into EVERY session of every inlining client, but
+// only the ANSWERS were measured — the definitions surface was invisible. Measured, not gated:
+// the descriptions are P1's experimental subject, and trimming un-measured burns the experiment.
+{
+  const drive = [
+    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'bench', version: '0' } } }),
+    JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+  ].join('\n') + '\n';
+  const r = sh(S('mcp-server.mjs'), [], { input: drive });
+  const line = (r.stdout || '').split('\n').find((l) => l.includes('"id":2'));
+  session.toolsListBytes = line ? Buffer.byteLength(line, 'utf8') : null;
+  session.toolsListTokensApprox = line ? Math.round(Buffer.byteLength(line, 'utf8') / 4) : null;
+}
 
 // ---------------------------------------------------------------- toolBudgets
 const perTool = {};
@@ -205,19 +247,27 @@ else {
     breakCyclesMs: bc.ms,
     breakCyclesFactorVsRegexBaseline: factorOf(bc.ms),
     campaignMs: camp.status === 0 ? camp.ms : null,
-    ...(measurable ? {} : { factorNote: `baseline ${regexBase.ms}ms < ${BASELINE_FLOOR_MS}ms floor — factor gates only at repo scale` }),
+    ...(measurable ? {} : { factorNote: `baseline ${regexBase.ms}ms − ${spawnFloorMs}ms spawn = ${baselineWorkMs}ms work < ${BASELINE_FLOOR_MS}ms floor — factor gates only at repo scale` }),
   };
 }
 
 // ---------------------------------------------------------------- write + gate
 const payload = { ranAt: new Date().toISOString(), node: process.version, budgets, pipeline, session, toolBudgets, advisors, loaded, cyclic, tsEngine };
 const json = JSON.stringify(payload, null, 2) + '\n';
-mkdirSync(dirname(opt.out), { recursive: true }); writeFileSync(opt.out, json);
+if (opt.check) {
+  console.log(`[bench:all] --check: measured but did NOT write ${opt.out}`);
+} else {
+  mkdirSync(dirname(opt.out), { recursive: true }); writeFileSync(opt.out, json);
+}
 console.log(`[bench:all] pipeline cold ${pipeline.coldMs}ms / warm ${pipeline.warmMs}ms (reused: ${pipeline.stagesReused}) · session ${session.totalTokensApprox} tokens over ${calls.length} calls (valid: ${session.allValidJson}) · ts-engine ${tsEngine.skipped ? 'SKIPPED' : tsEngine.factor + 'x'}`);
-console.log(`[bench:all] wrote ${opt.out}`);
+if (!opt.check) console.log(`[bench:all] wrote ${opt.out}`);
 
 if (opt.gate) {
   const violations = [];
+  // A skipped promise is not a kept one. The factor gates go quiet below the measurement floor by
+  // design, so say which target was too small to judge — otherwise "all promises hold" reads
+  // identically whether the factor budgets were enforced or silently inapplicable.
+  if (!measurable) console.log(`[bench:all] factor budgets NOT enforced: ${pipeline.target} baseline ${regexBase.ms}ms − ${spawnFloorMs}ms spawn = ${baselineWorkMs}ms work < ${BASELINE_FLOOR_MS}ms floor`);
   if (!session.allValidJson) violations.push('session: a response failed to parse or errored');
   if (session.totalTokensApprox > budgets.sessionTokensMax) violations.push(`session: ${session.totalTokensApprox} tokens > sessionTokensMax ${budgets.sessionTokensMax}`);
   for (const [tool, bytes] of Object.entries(perTool)) if (bytes > budgets.perToolBytesMax) violations.push(`tool ${tool}: ${bytes}B > perToolBytesMax ${budgets.perToolBytesMax}`);

@@ -3,6 +3,13 @@
 Every tool, output, and workflow — the full detail behind the [README](../README.md).
 Bins, flags, environment variables, and exit codes are tabled separately in [`cli.md`](cli.md).
 
+For reading paths and file ownership, start with the [documentation index](README.md).
+
+Examples using `node scripts/...` run from a Codeweb source checkout; `<graph.json>`
+is a placeholder for your target’s graph path. npm users can follow the
+[runnable snapshot quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart)
+using shipped bins from their own repository.
+
 - [Outputs](#outputs-under-targetcodeweb)
 - [Query the graph](#query-the-graph-for-agents--humans)
 - [Guard agent edits (`diff`)](#guard-agent-edits-diff)
@@ -22,7 +29,7 @@ Bins, flags, environment variables, and exit codes are tabled separately in [`cl
 
 | File | What it is |
 |---|---|
-| `graph.json` | The machine-readable web: `nodes`, `edges`, `domains`, `overlaps`, plus `meta` (target root, engine, languages, stats). |
+| `graph.json` | The machine-readable web: `nodes`, `edges`, `domains`, `overlaps`, plus `meta` (target root, engine, languages, stats). Schema versioning (BKL-L2, recorded design): the schema is deliberately unversioned and changes **additively only** — consumers must tolerate unknown fields; a `meta.schemaVersion` field ships with the first breaking change, not before (a version nobody checks is noise). |
 | `report.html` | Self-contained interactive map — force-directed graph, domain tree, clickable node details, ranked overlap tab. No network/CDN required. |
 | `report.md` | The same map as plain markdown — domains, top nodes, ranked overlaps. |
 | `overlap.md` | The ranked consolidation opportunities in plain markdown. |
@@ -35,7 +42,7 @@ Once `graph.json` exists, `scripts/query.mjs` answers the structural questions a
 before they edit — read-only, deterministic, no LLM in the loop:
 
 ```
-node scripts/query.mjs <graph.json> --impact  <symbol>   # blast radius: transitive callers + domains touched
+node scripts/query.mjs <graph.json> --impact  <symbol>   # mapped call/inherit/reference consumers + domains
 node scripts/query.mjs <graph.json> --callers <symbol>   # direct callers
 node scripts/query.mjs <graph.json> --callees <symbol>   # direct callees
 node scripts/query.mjs <graph.json> --cycles             # file-level dependency cycles (SCCs)
@@ -66,9 +73,28 @@ node scripts/diff.mjs <before.json> <after.json> [--json]
 
 The verdict:
 
-- **Exits 1** on a new cycle, a new duplication, or a symbol that loses all its callers.
-- **Exits 0** on pure removals. Deleting code is an improvement, not a regression.
+- **Exits 1** on a new dependency cycle, a new body-confirmed duplication finding, or an
+  existing non-exported symbol that becomes an orphan. Exported symbols are exempt here. These checks cover the mapped graph; unresolved
+  dependencies can be absent.
+- Pure removals do not count as structural regressions; this says nothing about their behavioral safety.
 - A brand-new uncalled function never trips it — agents add functions before wiring them up.
+
+The edit preflight (`codeweb_simulate` and the post-edit hook) also flags exported symbols
+that lose their last mapped call-caller. It is a separate check from the diff’s orphan gate.
+See [the gate contract](ci-gate.md).
+
+For the installed-binary snapshot workflow, copy the full map to `before.json` **before** editing. Rebuild the full
+map after each edit or repair and compare it with that same saved file. Keep the baseline
+outside the regenerated workspace; the [quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart) supplies every command.
+
+**Codeweb 0.15.0 and later:** follow [the explicit-baseline workflow](cli.md#before-and-after-an-edit):
+`codeweb_refresh {baseline:true}` before editing, then
+`codeweb_diff {before:"baseline",refresh:true}` after editing and each repair.
+
+Inspect `analysis.checks` in responses. Refresh drops overlap evidence, so its
+diff does not evaluate duplication. `ok:true` means no regressions were found by the
+checks performed; it does not prove behavior or complete runtime dependency coverage.
+Run the project’s tests too.
 
 ## Gate every PR (GitHub Action)
 
@@ -86,12 +112,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }   # required — the gate diffs against the PR base
-      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@main
-        with: { target: src, comment: true }   # comment posts the structural review on the PR
+      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@v0.16.0
+        with: { target: src, comment: true, codeweb-ref: v0.16.0 }   # comment posts the review on the PR
 ```
 
-Locally: `node scripts/ci-gate.mjs --base <ref> [--target <subdir>]`. Pure removals never trip the
-gate; a brand-new uncalled function is reported but doesn't fail the build.
+Locally: `node scripts/ci-gate.mjs --base <ref> [--target <subdir>]`. Pure removals do not count as structural regressions; a brand-new uncalled function is reported but doesn't fail the build.
 
 ## Advise consolidations (`optimize.mjs`)
 
@@ -209,8 +234,8 @@ node scripts/context-pack.mjs  <graph.json> <symbol> [--json]   # minimal contex
 node scripts/simulate-edit.mjs <graph.json> --delete <sym> | --merge <a,b> [--into <id>] | --move <sym> --to <file>
 ```
 
-`context-pack` returns everything agents need to edit one symbol: its body, its callers with call
-sites, its callees, and the impact set. Agents work from a small window instead of whole files.
+`context-pack` returns a bounded source window for one mapped symbol: its body, mapped callers
+with lexical source windows, its callees, and the mapped impact set. Agents work from a small window instead of whole files.
 
 `simulate-edit` predicts the gate's verdict for a delete, merge, or move **without performing
 it**. Doomed edits get discarded before any code is written.
@@ -242,7 +267,9 @@ production `--callers` answers exclude tests.
 
 ## The MCP server, tool by tool
 
-`scripts/mcp-server.mjs` exposes all **27** of codeweb's tools to any MCP client. In the order
+`scripts/mcp-server.mjs` exposes **28** tools over MCP. The September 14 packaged assessment exercised the
+baseline loop with Codex CLI 0.154.0; it did not test Claude runtime compatibility or
+certify all tools across clients. See [assessment scope](../reports/paperclip-pilot/readiness-01/PACKAGED-ACCEPTANCE.md). In the order
 your agents meet them:
 
 - **Orient** — `codeweb_map` builds the graph; `codeweb_brief` is the day-one repo page (call it
@@ -251,8 +278,9 @@ your agents meet them:
   and `explain` (one symbol, everything known about it).
 - **Before writing** — `codeweb_find_similar` (does this already exist?), `placement` (where does
   a new symbol belong?), `context` (the minimal window needed to edit a symbol).
-- **Gate the edit** — `codeweb_simulate` (the gate's verdict for a delete/merge/move, before any
-  edit), then `refresh` + `diff` after it; `review`, `fitness`, and `risk` for PR time.
+- **Gate the edit** — `codeweb_simulate` preflights a delete/merge/move. Follow the
+  [version-specific snapshot workflow](#guard-agent-edits-diff) for verification; use
+  `review`, `fitness`, and `risk` for PR time.
 - **Clean up** — `codeweb_hotspots`, `deadcode`, `break_cycles`, `campaign`, `reading_order`,
   `codemod` (plan-only over MCP — `--write` is not exposed).
 - **Housekeeping** — `codeweb_annotate` (false-positive suppressions, kept in a sidecar, never in
@@ -271,8 +299,10 @@ or in an `.mcp.json`:
 { "mcpServers": { "codeweb": { "command": "node", "args": ["/abs/path/to/codeweb/scripts/mcp-server.mjs"] } } }
 ```
 
-The handshake carries `instructions` teaching the per-edit loop: *context → edit → refresh →
-diff-gate*.
+The server handshake teaches the explicit-baseline loop. Installed binaries can also
+compare a saved full map against rebuilt snapshots, as described
+[above](#guard-agent-edits-diff). Query results describe mapped dependencies; dynamic or
+unresolved callers can be absent.
 
 ## Components
 
@@ -282,7 +312,7 @@ codeweb/
 ├── commands/codeweb.md              # /codeweb trigger
 ├── scripts/                         # the deterministic engine (default fast path)
 │   ├── run.mjs                      # orchestrator — one command, runs all stages per target
-│   ├── extract-symbols.mjs         # stage 1: source -> atomic nodes + edges (JS/TS/Python/Rust/Go)
+│   ├── extract-symbols.mjs         # stage 1: source -> atomic nodes + edges (all 13 native languages)
 │   ├── cluster3.mjs                # stage 2: hub-strip + directory-anchored domains
 │   ├── overlap.mjs                 # stage 3: body-confirmed duplication/overlap detection
 │   ├── build-report.mjs            # stage 4: graph.json -> interactive report.html + report.md
@@ -331,3 +361,8 @@ codeweb/
 ├── assets/                          # brand art (logo, hero, animated demo) + report screenshots
 └── README.md
 ```
+
+
+Known unsupported declarations, unresolved local JSX and ambiguous call targets make gate comparisons inconclusive,
+with `ok:false`, diagnostic locations, and CLI exit 2. See [incomplete extraction](cli.md#known-incomplete-extraction).
+An unflagged graph does not prove full extraction coverage.

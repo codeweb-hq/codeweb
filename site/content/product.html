@@ -26,7 +26,7 @@
     <div class="split">
       <div>
         <span class="eyebrow">Fast path</span>
-        <h2>Eleven languages, parse-free</h2>
+        <h2>Thirteen languages, parse-free</h2>
         <p>The deterministic extractor emits atomic nodes and edges for these languages without a heavyweight parser. Everything else routes through an agent fallback that returns the same node/edge shape.</p>
         <p>{{languages}}</p>
         <p class="muted">Engine modes: <code>hybrid</code> (default — uses ctags/ripgrep when available, falls back to regex), <code>tools</code>, and <code>read</code>. Extraction parity across the original five languages is independently verified.</p>
@@ -68,10 +68,11 @@
     <div class="split">
       <div>
         <span class="eyebrow">Keep structure honest</span>
-        <h2>A CI gate that fails the PR when an edit makes structure worse</h2>
+        <h2 id="ci-gate">A CI gate that fails the PR when an edit makes structure worse</h2>
         <p>The gate runs the same regression verdict as <code>codeweb_diff</code> on each pull request. It builds the graph before and after the change.</p>
         <p>The gate fails on a new dependency cycle, a new body-confirmed duplication, or a symbol that loses all callers. A change that only removes code passes.</p>
-        <p class="muted">codeweb dogfoods its own gate: PRs that touch the engine run it, and it stays green.</p>
+        <p>No LLM is in the checks. A passing check does not prove the program works. Inspect unresolved analysis and run the relevant tests.</p>
+        <p>Use the package gate with <code>--report-only</code> during rollout. Findings retain their verdict; setup and analysis errors still fail.</p>
       </div>
       <div>
 <pre><code>name: codeweb gate
@@ -83,9 +84,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@main
+      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@v0.16.0
         with:
-          target: src</code></pre>
+          target: src
+          codeweb-ref: v0.16.0</code></pre>
       </div>
     </div>
   </div>
@@ -95,6 +97,26 @@ jobs:
   <div class="wrap">
     <div class="section-head center">
       <span class="eyebrow">Principles</span>
+      <h2 id="vs-lsp">"My agent already has language-server lookups — why a map?"</h2>
+    </div>
+    <!-- GRW-F5 (COMPETITIVE §3.2): the audience's first objection, answered where they decide.
+         Capability comparison only — no numbers that don't trace to the ledger. -->
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>LSP answers one hop, on demand</h3>
+        <p>A language server is built for the editor loop: definitions, direct references, rename — one symbol, one hop, computed per request inside a live session. There is no whole-program artifact to diff, rank, or gate a pull request on.</p>
+      </div>
+      <div class="card">
+        <h3>codeweb answers the whole graph — and CI can gate on it</h3>
+        <p>The map is one deterministic file: transitive impact ("what breaks two hops away"), duplication with body evidence, dead code, hotspots, and domain coupling. Agents query it over MCP; the CI gate diffs it to fail a structure-worsening PR.</p>
+        <p class="muted">The two compose — codeweb replaces the grep loop, not your language server.</p>
+      </div>
+    </div>
+    <div class="btn-row" style="justify-content:center;margin-top:var(--s-5)">
+      <a class="btn" href="lsp.html">The full answer, with receipts →</a>
+      <a class="btn" href="compare.html">Compare the approaches</a>
+    </div>
+    <div class="section-head" style="margin-top:2rem">
       <h2>Why it can be trusted in the loop</h2>
     </div>
     <div class="prose">{{philosophy}}</div>

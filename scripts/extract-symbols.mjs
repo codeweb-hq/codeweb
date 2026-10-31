@@ -13,21 +13,28 @@
 // Usage:
 //   node extract-symbols.mjs <path> [--out fragment.json] [--no-ctags]
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, realpathSync } from 'node:fs';
+import * as nativeFs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { relative, resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url'; // finding #40 (T-40.3): main-guard idiom (the hooks' verbatim compare)
 import { isTestFile, roleOf, compileRoleOverrides } from './lib/graph-ops.mjs'; // F4/v7: test predicate + code-role (shared, one truth)
-import { atomicWrite, parseArgs } from './lib/cli.mjs'; // finding 3: cache/fragment writes are rename-atomic (hooks + refresh read them concurrently)
-import { SRC_RE } from './lib/common.mjs'; // finding 25: one truth for the mappable-source list (the copy here could drift)
-import { scanSymbols, bodyEnd, parseSignature, DYNAMIC_RE, langOf } from './lib/lang-rules.mjs'; // finding 25: pure per-language rules
+import { atomicWrite, parseArgs, sameFile } from './lib/cli.mjs'; // finding 3: cache/fragment writes are rename-atomic (hooks + refresh read them concurrently)
+import { SRC_RE, EXTRACTION_SKIP } from './lib/common.mjs'; // discovery scope shared with hooks
+import { scanSymbols, bodyEnd, parseSignature, DYNAMIC_RE, langOf, CPP_RE, C_RE, C_FAMILY_RE } from './lib/lang-rules.mjs'; // finding 25: pure per-language rules
 import { createImportResolver, defaultExportOf, importCandidates } from './lib/import-resolve.mjs'; // finding 25: cross-file name binding, one place; finding #11: shared specifier-candidate list
 import { cyclomatic, nestingDepth } from './lib/complexity.mjs'; // F4: per-symbol complexity/nesting
+import { sameLineDeclarations, extractionAnalysis } from './lib/analysis-completeness.mjs';
 import { maskJs, maskPy, maskRuby } from './lib/masking.mjs'; // comment/string/regex-literal blanking (one truth, shared with codemod's rewrite gate)
+import { scanStaticUsages } from './lib/static-usages.mjs';
 import { createOwnerStack } from './lib/enclosing.mjs'; // finding #21: live open-class stack (property-pinned identical to the linear scan)
 import { createEdgeDeriver, idFile, markPublicApi, resolveTypedIntents } from './lib/edge-derive.mjs'; // finding #40: per-file derivation factory + pub-API walk + typed-intent resolution; idFile (id->file split) is its one truth, imported back
 import { sha1 } from './lib/hash.mjs'; // one truth — codeweb's own gate flagged the duplicate on this branch
 import { loadTsEngine, loadLangEngine, probeAst } from './lib/ts-engine.mjs'; // optional tree-sitter tiers (JS/TS + Java/C# dispatch)
+
+// Shared discovery vocabulary; evidence snapshots select the fallback walk explicitly.
+export { EXTRACTION_SKIP } from './lib/common.mjs';
+export const EXTRACTION_MANIFESTS = Object.freeze(['package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'Gemfile', 'composer.json', 'Package.swift']);
 
 // F0: bump when scanSymbols/ctagsSymbols OUTPUT or the cache format changes — invalidates stale caches.
 // v2: nodes carry complexity/maxDepth (F4) + the cache holds per-file edge lists + a symbol signature (F9).
@@ -56,7 +63,17 @@ import { loadTsEngine, loadLangEngine, probeAst } from './lib/ts-engine.mjs'; //
 // v18: JSON config tier — .json files join the resolution universe (relSet + fileSig) and
 // imported ones become <module> nodes; import candidates gained .json/index.json, so v17 caches
 // embed pre-json resolution verdicts and must not replay.
-const SCANNER_VERSION = 18; // v18 (JSON tier) over v17: derivation-semantics change (WS-D review) —
+// v19: C++ joins as a first-class language (charter non-goal 8 as amended by A2). SRC_RE gained
+// six extensions, so a v18 cache's fileSig was computed over a file set that EXCLUDED every C++
+// file; its cached binds/edges embed resolution verdicts taken without them. Derivation moved too
+// (a C++ `p->m()` is now gated as a member call instead of resolving by bare name), which is
+// exactly the class of change the ladder exists to invalidate.
+// v20: C joins on the same rule (second grammar source, amendment A2). SRC_RE gained `.c`/`.h`, so
+// a v19 cache's fileSig again spans a file set that excluded them — and `.h` in particular changes
+// what EXISTING C++ files resolve to, because a quoted `#include "x.h"` had no candidate before.
+// v21: COD-9 cached declaration diagnostics; invalidate unqualified old caches.
+// v22: multiline control-head regex masking in diagnostic scanning.
+const SCANNER_VERSION = 24; // aligned JSX definitions, lexical scopes, callable aliases and export surfaces.
 // the bare-name fallback excludes closure-local targets (closureLocalIds), and symbolSig annotates
 // eligibility so a nesting flip invalidates cached edges. A previous-version cache is discarded at
 // load (one cold rebuild, never a crash) — the read gate below only accepts an exact version match.
@@ -81,6 +98,13 @@ let _tsEnginePromise;               // undefined = not attempted; Promise<engine
 const _langEnginePromises = {};     // langKey -> Promise<engine|null>
 
 export async function runExtract(opts = {}) {
+  // An input adapter is private immutable analysis, never a cache/output transport.
+  // Ordinary callers continue using the exact native filesystem and discovery paths.
+  const input = opts.input;
+  if (input && (opts.engine !== 'regex' || opts.ctags !== false || opts.cache || opts.out)) {
+    throw new ExtractError(2, 'snapshot input requires regex, ctags:false, no cache or output');
+  }
+  const { readFileSync, existsSync, readdirSync, statSync } = input || nativeFs;
   // Defaults == today's CLI defaults (ctags on, engine from CODEWEB_ENGINE) so engineMode / cache
   // namespace / SCANNER_VERSION match — a warm cache the CLI wrote is reused by an in-process call.
   opts = { path: null, out: null, ctags: true, target: null, cache: null, full: false, allowEmpty: false, engine: process.env.CODEWEB_ENGINE || null, ...opts };
@@ -116,9 +140,12 @@ const roleFor = (rel) => roleOverride(rel) || roleOf(rel);
 if (!existsSync(root)) throw new ExtractError(1, `[extract] not found: ${root}`);
 
 const SRC = SRC_RE; // finding 25: the extractor and the hooks share ONE source-extension list
-const SKIP = /(^|[\\/])(node_modules|\.git|dist|build|out|vendor|third_party|\.codeweb|coverage)([\\/]|$)/;
+const SKIP = EXTRACTION_SKIP;
 
-function tryExec(cmd, args) { try { return execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 1 << 28 }); } catch { return null; } }
+// Optional accelerators may reject our flags (Apple ctags is not Universal
+// Ctags). Capture their diagnostics while falling back; extractor failures still
+// throw ExtractError and are reported by the CLI or mapped advisory hook.
+function tryExec(cmd, args) { try { return execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { return null; } }
 function toolExists(cmd) { return tryExec(cmd, ['--version']) != null; }
 
 // ---- enumerate source files ----
@@ -128,20 +155,22 @@ function toolExists(cmd) { return tryExec(cmd, ['--version']) != null; }
 // exists only for a json file something actually imports (created on demand with the barrels).
 const JSON_RE = /\.json$/;
 function listFiles() {
-  const viaRg = tryExec('rg', ['--files', root]);
+  const viaRg = input ? null : tryExec('rg', ['--files', root]);
   let files;
   if (viaRg != null) {
     files = viaRg.split(/\r?\n/).filter(Boolean);
   } else {
     files = [];
-    const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (SKIP.test(p)) continue; if (e.isDirectory()) walk(p); else files.push(p); } };
-    walk(root);
+    const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (SKIP.test(input ? relative(root, p) : p)) continue; if (e.isDirectory()) walk(p); else files.push(p); } };
+    // rg accepts a file root; preserve that behavior when discovery falls back.
+    if (statSync(root).isFile()) files.push(root);
+    else walk(root);
   }
   // Canonicalize enumeration order: `rg --files` (parallel walk) and readdir can return files in a
   // nondeterministic order, which leaks into node-array order AND cluster3's domain-assignment
   // tie-breaks — making the pipeline non-reproducible. Sorting pins a stable order without changing
   // the file set. (Surfaced + verified by the determinism study, H1.)
-  const kept = files.filter((f) => !SKIP.test(f));
+  const kept = files.filter((f) => !SKIP.test(input ? relative(root, f) : f));
   return { src: kept.filter((f) => SRC.test(f)).sort(), json: kept.filter((f) => JSON_RE.test(f)).sort() };
 }
 
@@ -153,7 +182,7 @@ const rel = (f) => relative(root, f).replace(/\\/g, '/');
 // precisely); a cross-package NAME COLLISION is exactly how `create-vite` template files ended up
 // "calling" vite's normalizePath. Single-package repos (or trees with no manifests) all map to ''
 // — behavior there is unchanged.
-const MANIFESTS = ['package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'pom.xml', 'build.gradle', 'build.gradle.kts', 'Gemfile', 'composer.json', 'Package.swift'];
+const MANIFESTS = EXTRACTION_MANIFESTS;
 const manifestMemo = new Map(); // dir -> boolean
 const hasManifest = (dir) => {
   if (!manifestMemo.has(dir)) {
@@ -191,7 +220,11 @@ function maskedOnce(relPath, kind, text) {
   if (v === undefined) {
     v = kind === 'py' ? maskPy(text)
       : kind === 'rb' ? maskRuby(text)
+      // C++ include scanning needs the comments gone but the string VALUES intact — the include
+      // path lives inside the quotes, which the default mode blanks.
+      : kind === 'cppinc' ? maskJs(text, { keepValues: true })
       : maskJs(text, relPath.endsWith('.php') ? { hashComment: true } : undefined); // PHP `#` comments (finding #13)
+    if (kind === 'js' && /\.(jsx?|mjs|cjs|tsx?|mts|cts)$/.test(relPath)) v = scanStaticUsages(v, relPath).code;
     maskCache.set(k, v);
   }
   return v;
@@ -223,7 +256,7 @@ function ctagsBatchOnce() {
   if (ctagsBatch !== undefined) return ctagsBatch;
   try {
     const out = execFileSync('ctags', ['--output-format=json', '--fields=+n-P', '-f', '-', '-L', '-'],
-      { encoding: 'utf8', maxBuffer: 1 << 28, input: files.join('\n') });
+      { encoding: 'utf8', maxBuffer: 1 << 28, input: files.join('\n'), stdio: ['pipe', 'pipe', 'pipe'] });
     ctagsBatch = new Map();
     parseCtagsLines(out, ctagsBatch);
   } catch { ctagsBatch = null; }
@@ -343,7 +376,11 @@ const stampTier = !!(oldCache && !opts.full && process.env.CODEWEB_VERIFY_FRESHN
 // replayed, or any signature moved.
 let cacheDirty = !oldCache;
 let scanCount = 0;
-const scanFile = (f, text) => { scanCount++; return (useCtags && ctagsSymbols(f)) || scanSymbols(f, text, (kind) => maskedOnce(rel(f), kind, text)); };
+const scanFile = (f, text) => {
+  scanCount++;
+  const r = rel(f), executable = /\.(jsx?|mjs|cjs|tsx?|mts|cts)$/.test(r) ? maskedOnce(r, 'js', text) : text;
+  return (useCtags && ctagsSymbols(f)) || scanSymbols(f, executable, (kind) => maskedOnce(r, kind, text));
+};
 
 // ---- build nodes per file, with line ranges ----
 const nodes = [];
@@ -359,15 +396,16 @@ const sources = {};
 // answer-time tools can say "0 callers, but this repo routes calls dynamically in N file(s) —
 // absence of callers is weaker evidence" instead of sounding equally sure everywhere.
 const dynamicFiles = [];
+const analysisParts = [];
 for (const f of files) {
   const r = rel(f);
   const isPy = r.endsWith('.py');
   const isJsTs = /\.(jsx?|mjs|cjs|tsx?|mts|cts)$/.test(r); // finding #11: .mts/.cts are TS files
-  const isBraceLang = isJsTs || /\.(java|cs|php|kt|kts|swift)$/.test(r); // maskJs handles //, /* */ and "…" for all of them
+  const isBraceLang = isJsTs || /\.(java|cs|php|kt|kts|swift)$/.test(r) || C_FAMILY_RE.test(r); // maskJs handles //, /* */ and "…" for all of them
   const isIndentLang = isPy || r.endsWith('.rb'); // extents by dedent (Python) / end-at-indent (Ruby)
   const langKey = r.endsWith('.java') ? 'java' : r.endsWith('.cs') ? 'csharp'
     : r.endsWith('.py') ? 'python' : r.endsWith('.go') ? 'go' : r.endsWith('.rs') ? 'rust'
-    : r.endsWith('.rb') ? 'ruby' : r.endsWith('.php') ? 'php' : null; // #14: Ruby/PHP join the dispatch tier
+    : r.endsWith('.rb') ? 'ruby' : r.endsWith('.php') ? 'php' : CPP_RE.test(r) ? 'cpp' : C_RE.test(r) ? 'c' : null; // #14: Ruby/PHP join the dispatch tier; C++ then C follow (non-goal 8 / A2)
   // Does the AST tier owe this file products (methods/dispatch/complexity)? Drives cache-hit
   // validity — a hit without them must re-scan — and the lazy engine load below (Spec A).
   const needsAst = opts.engine !== 'regex' && ((isJsTs && astProbe.ts) || (langKey && astProbe[langKey]));
@@ -380,6 +418,7 @@ for (const f of files) {
     if (stq && stq.size === oldHit.stamp.s && Math.round(stq.mtimeMs) === oldHit.stamp.m) {
       sources[r] = { s: oldHit.stamp.s, m: oldHit.stamp.m, h: oldHit.hash };
       if (oldHit.dyn) dynamicFiles.push(r);
+      if (oldHit.analysis) analysisParts.push(oldHit.analysis);
       for (const n of oldHit.nodes) nodes.push(n); // this-run-private objects (the cache is JSON.parse'd fresh per run)
       fileSyms.set(f, { text: null, ranges: oldHit.ranges }); // text pulled lazily IF a landscape change needs it
       if (needsAst && isJsTs) {
@@ -419,7 +458,10 @@ for (const f of files) {
   sources[r] = st
     ? { s: st.size, m: Math.round(st.mtimeMs), h: contentHash }
     : { s: -1, m: 0, h: contentHash }; // never-fresh stamp for a file that kept changing
-  const isDyn = DYNAMIC_RE.test(text);
+  const fileAnalysis = isJsTs ? sameLineDeclarations(scanStaticUsages(maskJs(text, { statementRegex: true }), r).code, r) : { count: 0, diagnostics: [] };
+  analysisParts.push(fileAnalysis);
+  const dynamicCode = isPy ? maskedOnce(r, 'py', text) : isJsTs ? maskedOnce(r, 'js', text) : text;
+  const isDyn = DYNAMIC_RE.test(dynamicCode) || (isPy && /\bset_defaults\s*\([^)]*\bfunc\s*=/.test(dynamicCode) && /\.func\s*\(/.test(dynamicCode));
   if (isDyn) dynamicFiles.push(r);
   let syms;
   let astHit = null; // the cache entry serving this file's AST products (fully-valid hit only)
@@ -462,6 +504,8 @@ for (const f of files) {
     syms = scanFile(f, text);
   }
   const seen = new Set();
+  // A ctags accelerator also reads raw JSX: reject declarations whose executable source line is blank.
+  if (isJsTs) { const executable = maskedOnce(r, 'js', text).split(/\r?\n/); syms = syms.filter(s => executable[s.line - 1]?.trim()); }
   syms = syms.filter((s) => { const k = s.name + ':' + s.line; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.line - b.line);
   const lines = text.split(/\r?\n/);
   const total = lines.length;
@@ -618,6 +662,7 @@ for (const f of files) {
     const entry = newCache.files[r];
     entry.stamp = st ? { s: st.size, m: Math.round(st.mtimeMs) } : null;
     entry.dyn = isDyn ? 1 : 0;
+    entry.analysis = fileAnalysis;
     entry.nodes = nodes.slice(fileNodesStart);
     entry.ranges = ranges;
   }
@@ -785,12 +830,17 @@ for (const [fAbs2, rec2] of fileSyms) collectClosureLocals(rel(fAbs2), rec2.rang
 // Eligibility is part of the resolution landscape, so it ANNOTATES symbolSig ('\u0001' marker):
 // a nesting flip changes no node id, and an unannotated sig would replay every consumer's stale
 // verdict (fallback hit or drop) wholesale — the same blind-spot class rexSig closed for barrels.
-const symbolSig = sha1(nodes.map((n) => n.id + (closureLocalIds.has(n.id) ? '\u0001' : '')).slice().sort().join('\n') + '\0' + pkgBoundaries.join('\n'));
+const symbolKey = (n, locals, defaults) => n.id + (locals.has(n.id) ? '\u0001' : '') + (n.exports ? '\u0002' : '') + (defaults.get(n.file) === n.id ? '\u0003' : '');
+const nodeEligibility = new Map(nodes.map(n => [n.id, symbolKey(n, closureLocalIds, defaultExportByFile)]));
+const symbolSig = sha1([...nodeEligibility.values()].sort().join('\n') + '\0' + pkgBoundaries.join('\n'));
+if (newCache) newCache.defaultExports = [...defaultExportByFile];
 const pkgSig = sha1(pkgBoundaries.join('\n')); // finding #17: pkg-boundary repartition alone (zero label delta) must stay a wholesale flip
 
 const aliasByFile = new Map();   // fileAbs -> Map(localName -> symbolId in the target file) [named/default value]
 const nsAliasByFile = new Map(); // fileAbs -> Map(localName -> target REL file) [namespace/default OBJECT, for member access]
+const namespaceOnlyByFile = new Map(); // ES namespaces expose exports, unlike a default object/class.
 const classAliasByFile = new Map(); // fileAbs -> Map(localName -> CLASS node id) [default import whose default export is a class — for instanceof/static-method ref edges]
+const externalByFile = new Map();
 const importEdges = [];
 // finding 10: cached bindings embed RESOLVED target ids/files, so they are reusable only while
 // both the symbol set and the file list stand still — the same rule the F9 edge cache lives by.
@@ -861,15 +911,16 @@ const deltaDirty = (() => {
   // (the fallback's verdict on it changed while cand/bindDeps see nothing).
   const oldLocal = new Set();
   for (const [r2, e] of Object.entries(oldCache.files)) collectClosureLocals(r2, e.ranges, oldLocal);
+  const oldDefaults = new Map(oldCache.defaultExports || []);
   const oldByLabel = new Map();
   for (const e of Object.values(oldCache.files)) {
-    for (const n of e.nodes) { let l = oldByLabel.get(n.label); if (!l) oldByLabel.set(n.label, l = []); l.push(n.id + (oldLocal.has(n.id) ? '\u0001' : '')); }
+    for (const n of e.nodes) { let l = oldByLabel.get(n.label); if (!l) oldByLabel.set(n.label, l = []); l.push(symbolKey(n, oldLocal, oldDefaults)); }
   }
   const dirty = new Set();
   for (const [label, ids] of byName) {
     const o = oldByLabel.get(label);
     if (!o) { dirty.add(label); continue; }
-    const a = ids.map((id) => id + (closureLocalIds.has(id) ? '\u0001' : '')).sort(), b = o.sort();
+    const a = ids.map((id) => nodeEligibility.get(id)).sort(), b = o.sort();
     if (a.length !== b.length || a.some((v, i2) => v !== b[i2])) dirty.add(label);
   }
   for (const label of oldByLabel.keys()) if (!byName.has(label)) dirty.add(label);
@@ -885,6 +936,8 @@ for (const f of files) {
     if (b.a.length) aliasByFile.set(f, new Map(b.a));
     if (b.ns.length) nsAliasByFile.set(f, new Map(b.ns));
     if (b.cls.length) classAliasByFile.set(f, new Map(b.cls));
+    if (b.external?.length) externalByFile.set(f, new Set(b.external));
+    if (b.namespace?.length) namespaceOnlyByFile.set(f, new Set(b.namespace));
     for (const pair of b.ie) importEdges.push(pair);
     bindReplayed.add(r);
   };
@@ -905,15 +958,17 @@ for (const f of files) {
     replayBind(bindEntry.bind);
     continue;
   }
-  const { amap, nsmap, classmap, edges: bindEdges, deps, bindCand } = resolver.bindFileImports({
-    fAbs: f, r, isPy, text: textOf(f, fsRec), aId: anchorId(r), defaultExportByFile, kindById,
+  const { amap, nsmap, classmap, external, namespace, edges: bindEdges, deps, bindCand } = resolver.bindFileImports({
+    fAbs: f, r, isPy, isCpp: C_FAMILY_RE.test(r), text: textOf(f, fsRec), aId: anchorId(r), defaultExportByFile, kindById,
   });
   for (const pair of bindEdges) importEdges.push(pair);
   if (amap.size) aliasByFile.set(f, amap);
   if (nsmap.size) nsAliasByFile.set(f, nsmap);
   if (classmap.size) classAliasByFile.set(f, classmap);
+  if (external.size) externalByFile.set(f, external);
+  if (namespace.size) namespaceOnlyByFile.set(f, namespace);
   if (bindEntry) {
-    bindEntry.bind = { a: [...amap], ns: [...nsmap], cls: [...classmap], ie: bindEdges };
+    bindEntry.bind = { a: [...amap], ns: [...nsmap], cls: [...classmap], external: [...external], namespace: [...namespace], ie: bindEdges };
     bindEntry.bindDeps = [...deps].sort();   // finding #17 (T-17.3)
     bindEntry.bindCand = [...bindCand].sort();
     cacheDirty = true;
@@ -921,7 +976,7 @@ for (const f of files) {
 }
 
 // ---- derive call edges (F9: incremental, per-file, cacheable) ------------------------------
-const LEGACY_FALLBACK = !!process.env.CODEWEB_LEGACY_FALLBACK; // A/B: restore pre-fix byName[0] wiring for regression testing
+const LEGACY_FALLBACK = !input && !!process.env.CODEWEB_LEGACY_FALLBACK; // A/B only outside fixed snapshot profile
 
 // finding #40 (WS-H T-40.1): per-file edge derivation moved VERBATIM into lib/edge-derive.mjs's
 // createEdgeDeriver factory. Free-vars re-derived against the CURRENT engine (not the spec-time
@@ -929,7 +984,7 @@ const LEGACY_FALLBACK = !!process.env.CODEWEB_LEGACY_FALLBACK; // A/B: restore p
 // method), closureLocalIds (WS-D-review magnet fix), legacyFallback (the env read stays here);
 // KEYWORDS/parseSignature/isTestFile/buildInnermostIndex are the lib's own pure-module imports.
 // The edge loop below (cache replay/record) + #17 delta/dirty-label computation stay orchestration.
-const { deriveFileEdges } = createEdgeDeriver({ byName, pkgOf, roleFor, resolveFileMember, closureLocalIds, legacyFallback: LEGACY_FALLBACK });
+const { deriveFileEdges } = createEdgeDeriver({ byName, pkgOf, roleFor, resolveFileMember, closureLocalIds, legacyFallback: LEGACY_FALLBACK, kindById });
 
 const edges = [];
 let ambiguousDropped = 0, shortNameDropped = 0, edgedCount = 0;
@@ -961,15 +1016,16 @@ for (const f of edgeFiles) {
     || (deltaDirty && prev && prev.cand && !prev.cand.some((n) => deltaDirty.has(n)) && bindReplayed.has(r));
   let result;
   if (prev && cacheEntry && prev.hash === cacheEntry.hash && prev.edges && prev.ids && deltaOk) {
-    result = { edges: decodeEntryEdges(prev), hasModule: !!prev.hasModule, ambiguous: prev.ambiguous || 0, short: prev.short || 0, cand: prev.cand }; // reuse (#19: decode fresh objects)
+    result = { edges: decodeEntryEdges(prev), hasModule: !!prev.hasModule, ambiguous: prev.ambiguous || 0, short: prev.short || 0, cand: prev.cand, analysis: prev.edgeAnalysis || { count: 0, diagnostics: [] } }; // reuse (#19: decode fresh objects)
   } else {
     // finding 10: text + mask only on the derive path — an edge-cache hit never touches the file
     const text = textOf(f, rec);
-    const lines = (r.endsWith('.py') ? maskedOnce(r, 'py', text) : r.endsWith('.rb') ? maskedOnce(r, 'rb', text) : /\.(jsx?|mjs|cjs|tsx?|mts|cts|java|cs|php|kt|kts|swift)$/.test(r) ? maskedOnce(r, 'js', text) : text).split(/\r?\n/); // no calls from docstrings/comments/strings
-    result = deriveFileEdges(r, lines, rec.ranges, aliasByFile.get(f), nsAliasByFile.get(f), classAliasByFile.get(f));
+    const lines = (r.endsWith('.py') ? maskedOnce(r, 'py', text) : r.endsWith('.rb') ? maskedOnce(r, 'rb', text) : /\.(jsx?|mjs|cjs|tsx?|mts|cts|java|cs|php|kt|kts|swift|c|h|cpp|cc|cxx|hpp|hh|hxx)$/.test(r) ? maskedOnce(r, 'js', text) : text).split(/\r?\n/); // no calls from docstrings/comments/strings
+    result = deriveFileEdges(r, lines, rec.ranges, aliasByFile.get(f), nsAliasByFile.get(f), classAliasByFile.get(f), externalByFile.get(f), namespaceOnlyByFile.get(f));
     edgedCount++;
   }
-  if (cacheEntry) { cacheEntry.edges = result.edges; cacheEntry.hasModule = result.hasModule; cacheEntry.ambiguous = result.ambiguous; cacheEntry.short = result.short; if (result.cand) cacheEntry.cand = result.cand; }
+  if (cacheEntry) { cacheEntry.edges = result.edges; cacheEntry.hasModule = result.hasModule; cacheEntry.ambiguous = result.ambiguous; cacheEntry.short = result.short; cacheEntry.edgeAnalysis = result.analysis; if (result.cand) cacheEntry.cand = result.cand; }
+  if (result.analysis) analysisParts.push(result.analysis);
   if (result.hasModule && !nodeIdSet.has(r + ':<module>')) {
     nodes.push({ id: r + ':<module>', label: '<module>', kind: 'module', file: r, line: 1, loc: 1, exports: false, domain: '', summary: '', role: roleFor(r) });
     nodeIdSet.add(r + ':<module>');
@@ -984,7 +1040,7 @@ if (newCache) { newCache.symbolSig = symbolSig; newCache.bindSig = bindSig; newC
 // Deduped against the call edges by (from,to): caller ids are file-local, so this set has no
 // cross-file collisions and matches the original single-edgeSet behaviour exactly.
 let importEdgeCount = 0;
-const edgeKeys = new Set(edges.map((e) => e.from + ' ' + e.to));
+const edgeKeys = new Set(edges.filter(e => e.kind !== 'ref').map((e) => e.from + ' ' + e.to));
 // A coarse module-import edge (namespace/default/side) targets the imported file's <module> node,
 // created on demand here so a symbol-less barrel still gets a node. This keeps the file-level "imports
 // this module" signal (fileCycles/coupling unchanged — same file-pair) without polluting a symbol.
@@ -1076,6 +1132,7 @@ const fragment = {
     // warm run that never initializes the engine emits the same meta as a cold one (Spec A).
     ...(opts.engine !== 'regex' && astProbe.ts && !astLoadFailed ? { complexityEngine: astProbe.tsVersion } : {}),
     languages, symbols: nodes.length,
+    analysis: extractionAnalysis(analysisParts),
     sources, // per-file {s: size, m: mtimeMs, h: sha1} staleness stamps (h powers the verify tier — finding 4)
     // files with dynamic-dispatch patterns — the honest asterisk on every "0 callers" answer
     ...(dynamicFiles.length ? { dynamic: { files: dynamicFiles.length, sample: dynamicFiles.slice(0, 3) } } : {}),
@@ -1092,7 +1149,8 @@ const fragment = {
 // trees can land here.) Guarded before any artifact/cache write so a failed run leaves nothing.
 if (nodes.length === 0 && !opts.allowEmpty) {
   throw new ExtractError(1, `[extract] 0 symbols found in ${files.length} supported file(s) under ${root} — the files parsed but defined no functions, classes, or methods.\n` +
-    '[extract]   is this the right directory? Pass --allow-empty to proceed with an empty map.');
+    '[extract]   is this the right directory? Pass --allow-empty to proceed with an empty map.' +
+    (fragment.meta.analysis.status === 'incomplete' ? `\n[extract] analysis incomplete: ${JSON.stringify(fragment.meta.analysis)}` : ''));
 }
 if (newCache && !astLoadFailed && cacheDirty) {
   try {
@@ -1123,7 +1181,7 @@ if (newCache && !astLoadFailed && cacheDirty) {
 // `ast: loaded` (initialized this run) / `ast: idle` (available, nothing needed a parse — the warm
 // path Spec A exists for) / `ast: off` (regex opt-out, unavailable, or load failure).
 const astAvailable = opts.engine !== 'regex' && Object.entries(astProbe).some(([k, v]) => k !== 'tsVersion' && v === true);
-const typedLangs = ['java', 'csharp', 'python', 'go', 'rust', 'php'].filter((k) => typedLangsSeen.has(k)); // ruby has no static types — self/implicit dispatch only
+const typedLangs = ['java', 'csharp', 'python', 'go', 'rust', 'php', 'cpp'].filter((k) => typedLangsSeen.has(k)); // ruby has no static types — self/implicit dispatch only; C has no receivers at all (its tier resolves function-pointer tables, counted as dispatch edges)
 const dispatchNote = astAvailable
   ? `; wired ${dispatchEdgeCount} dispatch edge(s)${dispatchDropped ? `, dropped ${dispatchDropped} (missing endpoint)` : ''}` +
     (typedLangs.length ? `; typed-dispatch (${typedLangs.join('+')}) ${typedWired} wired${typedDropped ? `, ${typedDropped} dropped (ambiguous/absent)` : ''}` : '')
@@ -1131,7 +1189,9 @@ const dispatchNote = astAvailable
 const anyAstLoaded = astEngineLoadedThisRun;
 const astState = anyAstLoaded ? 'loaded' : (!astAvailable || astLoadFailed) ? 'off' : 'idle';
 const banner = `[extract] ${nodes.length} symbols, ${edges.length} edges (${edges.length - importEdgeCount} call + ${importEdgeCount} import) from ${files.length} files${jsonMappedCount ? ` (+${jsonMappedCount} json)` : ''} (${useCtags ? 'ctags' : 'regex'}${opts.engine !== 'regex' && astProbe.ts ? '+tree-sitter' : ''} engine); dropped ${ambiguousDropped} ambiguous bare-call edges (${shortNameDropped} short-name)${dispatchNote}; scanned ${scanCount}/${files.length} file(s); edged ${edgedCount}/${edgeFiles.length}${opts.cache ? ' (cache on)' : ''}; ast: ${astState}`;
-  return { fragment, banner };
+  const diagnosticBanner = fragment.meta.analysis.status === 'incomplete'
+    ? `\n[extract] analysis incomplete: ${fragment.meta.analysis.diagnosticCount} known extraction limitation(s); inspect meta.analysis.diagnostics (file/line/column/evidence).` : '';
+  return { fragment, banner: banner + diagnosticBanner };
 }
 
 // ---- CLI front door: argv parse, --out/stdout write, exit codes (the ONLY process-lifecycle owner) ----
@@ -1170,10 +1230,11 @@ async function main() {
 }
 
 // Execute the CLI ONLY when run directly — the repo's proven guard idiom (post-edit-diff.mjs:79,
-// pre-edit-impact.mjs, session-brief.mjs use it verbatim). LEXICAL compare (path.resolve, no
-// realpath): safe here because extract-symbols is NOT a package.json `bin` entry (only run.mjs /
-// mcp-server.mjs are) and every in-repo caller spawns it by real absolute path — do NOT expose it
-// via `bin` without realpathSync on both sides (a symlinked argv[1] would skip main()).
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+// pre-edit-impact.mjs, session-brief.mjs use it verbatim). Both sides are resolved through
+// realpath: a LEXICAL compare silently skips main() whenever the caller reaches this script through
+// a symlink (macOS `/tmp` -> `/private/tmp` is the everyday case), so the process exits 0 having
+// written nothing. Falls back to the lexical form when a path cannot be realpath'd (deleted or
+// unreadable), which is the pre-existing behavior.
+if (process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url))) {
   main();
 }

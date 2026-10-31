@@ -117,6 +117,8 @@ export function probeAst() {
     rust: rt.present && existsSync(LANG_GRAMMARS.rust),
     ruby: rt.present && existsSync(LANG_GRAMMARS.ruby),   // #14
     php: rt.present && existsSync(LANG_GRAMMARS.php),     // #14
+    cpp: rt.present && existsSync(LANG_GRAMMARS.cpp),     // charter non-goal 8 / amendment A2
+    c: rt.present && existsSync(LANG_GRAMMARS.c),         // charter non-goal 8 / amendment A2 (second source)
     tsVersion: ts ? tsVersionString(rt.version) : null,
   };
 }
@@ -364,8 +366,10 @@ const LANG_GRAMMARS = {
   rust: join(HERE, '..', 'grammars', 'tree-sitter-rust.wasm'),
   ruby: join(HERE, '..', 'grammars', 'tree-sitter-ruby.wasm'),
   php: join(HERE, '..', 'grammars', 'tree-sitter-php.wasm'),
+  cpp: join(HERE, '..', 'grammars', 'tree-sitter-cpp.wasm'),
+  c: join(HERE, '..', 'grammars', 'tree-sitter-c.wasm'),
 };
-// ---- one dispatch skeleton, seven language tables (finding 26) ------------------------------
+// ---- one dispatch skeleton, nine language tables (finding 26) -------------------------------
 // Every dispatch tier answers the same two questions — "is this a self/receiver call to a
 // sibling method?" (thisCalls, resolved in-file) and "is the receiver a typed parameter?"
 // (typedIntents, resolved globally by extract-symbols under the one-owner rule) — but the walker
@@ -379,10 +383,13 @@ const BARE_TYPE = /^[A-Za-z_][\w]*$/;
 const stripRustRef = (t) => t.replace(/^&\s*(?:mut\s+)?/, '').trim();
 /** THE ancestor climb (was five per-language copies): nearest ancestor whose type is in `types`. */
 const upTo = (n, types) => { let c = n.parent; while (c && !types.has(c.type)) c = c.parent; return c; };
-/** THE typed-parameter reader: `entry(p)` -> {nm, ty}|null per `paramType` node (deep for PHP). */
+/**
+ * THE typed-parameter reader: `entry(p)` -> {nm, ty}|null per `paramType` node (deep for PHP).
+ * `paramsNode` overrides where the list hangs — C++ puts it on the declarator, not the definition.
+ */
 const typedParamsFrom = (T) => (methodNode) => {
   const map = new Map();
-  const params = methodNode?.childForFieldName('parameters');
+  const params = T.paramsNode ? T.paramsNode(methodNode) : methodNode?.childForFieldName('parameters');
   if (!params) return map;
   const each = (p) => { if (p.type === T.paramType) { const e = T.entry(p); if (e) map.set(e.nm, e.ty); } };
   if (T.deep) walkTree(params, each);
@@ -412,6 +419,65 @@ const goRecvOf = (m) => { // -> {varName, typeName} | null, pointer stripped
 };
 const GO_FN_TYPES = new Set(['method_declaration', 'function_declaration']);
 const PHP_METHOD = new Set(['method_declaration']), PHP_CLASS = new Set(['class_declaration']);
+// C++ (non-goal 8 / A2). Its two shapes the other tiers don't have: a member body may sit INSIDE
+// the class (like Java) or OUT OF LINE behind a `Type::` qualifier (like nothing else here), and a
+// receiver may be a reference (`r.m()`) or a pointer (`p->m()`) — one `field_expression` either way.
+const CPP_FN = new Set(['function_definition']);
+const CPP_CLASS = new Set(['class_specifier', 'struct_specifier', 'union_specifier']);
+/** Unwrap `*`/`&`/`[]`/parenthesized declarator layers down to the identifier-bearing node. */
+const cppDeclCore = (d) => {
+  let c = d;
+  while (c && ['pointer_declarator', 'reference_declarator', 'array_declarator', 'parenthesized_declarator', 'init_declarator'].includes(c.type)) {
+    c = c.childForFieldName('declarator') || c.namedChild(0);
+  }
+  return c;
+};
+/** The innermost name of a `qualified_identifier` (`geo::Shape` -> `Shape`), else null. */
+const cppQualTail = (q) => {
+  let id = q;
+  while (id && id.type === 'qualified_identifier') id = id.childForFieldName('name');
+  return id && (id.type === 'type_identifier' || id.type === 'identifier') && BARE_TYPE.test(id.text) ? id.text : null;
+};
+/** A function_definition's `{name, owner}` — owner from the `Type::` qualifier, else null. */
+const cppFnName = (fn) => {
+  let d = cppDeclCore(fn.childForFieldName('declarator'));
+  if (!d || d.type !== 'function_declarator') return null;
+  let id = cppDeclCore(d.childForFieldName('declarator'));
+  // A qualified name nests scope-first (`geo::Shape::area`): walk to the innermost name, keeping
+  // the LAST scope seen — namespaces are outer, so what remains adjacent to the name is the class.
+  let owner = null;
+  while (id && id.type === 'qualified_identifier') {
+    const scope = id.childForFieldName('scope');
+    if (scope && BARE_TYPE.test(scope.text)) owner = scope.text;
+    id = id.childForFieldName('name');
+  }
+  if (!id || !['identifier', 'field_identifier', 'destructor_name', 'operator_name'].includes(id.type)) return null;
+  return { name: id.text, owner };
+};
+/** The class a member DEFINITION belongs to: its `Type::` qualifier, else the enclosing class. */
+const cppOwnerOf = (fn) => {
+  const nm = cppFnName(fn);
+  if (!nm) return null;
+  if (nm.owner) return nm.owner;
+  const cls = upTo(fn, CPP_CLASS);
+  const cn = cls && fieldName(cls);
+  return cn && BARE_TYPE.test(cn) ? cn : null;
+};
+// C (non-goal 8 / A2, second source). C has no methods, so it has no receiver dispatch at all —
+// its polymorphism is the FUNCTION-POINTER TABLE (`struct Ops ops = { .compute = impl };` then
+// `ops.compute(v)`), the shape every driver/plugin/vtable in C is built from. The designated
+// initializer NAMES the implementation, so this is evidence, not inference: the same standard the
+// other tiers hold to. Bindings are collected per FILE and keyed by the field name; a field bound
+// two different ways in one file is a genuine ambiguity and wires nothing.
+const C_FN = new Set(['function_definition']);
+/** `.field = impl` / `.field = &impl` -> the bare implementation name, else null. */
+const cInitTarget = (v) => {
+  if (!v) return null;
+  // `&impl` is the same binding as `impl` — the address-of is noise on a function name.
+  const inner = v.type === 'pointer_expression' ? v.childForFieldName('argument') : v;
+  return inner && inner.type === 'identifier' && BARE_TYPE.test(inner.text) ? inner.text : null;
+};
+const AMBIGUOUS_BINDING = Symbol('ambiguous');
 const PY_FN = new Set(['function_definition']), PY_CLASS = new Set(['class_definition']);
 const RS_FN = new Set(['function_item']), RS_IMPL = new Set(['impl_item']);
 const JC_METHOD = new Set(['method_declaration']), JC_CLASS = new Set(['class_declaration']);
@@ -421,7 +487,9 @@ const fieldName = (n) => n?.childForFieldName('name')?.text || null;
 // Each table: collectOwners(root) -> Map(owner -> Set(members)); callSite(n) -> {obj, prop}|null;
 // enclosingOf(n) -> {owner, name, methodNode, ...}|null (its own null-guards match the old
 // walker exactly); isSelf(obj, ctx); identName(obj) -> bare receiver name|null (typed path);
-// typedParams -> {paramType, deep?, entry} or absent (no typed tier, e.g. Ruby).
+// typedParams -> {paramType, deep?, entry} or absent (no typed tier, e.g. Ruby);
+// localTarget(site, ctx, owners) -> callee label|null for a language whose in-file dispatch does
+// not land on a sibling method (C's function-pointer table), absent for every other language.
 const LANG_DISPATCH = {
   // #14: Ruby — no static types, so the dispatch win is self./implicit-receiver calls INSIDE a
   // class (the parser has already disambiguated `prepare(1)` as a CALL, so wiring it to a sibling
@@ -492,6 +560,107 @@ const LANG_DISPATCH = {
         return nm && ty && BARE_TYPE.test(ty) ? { nm, ty } : null;
       },
     },
+  },
+  // C++ — `this->m()` / `(*this).m()` resolve in-class; `r.m()` and `p->m()` where the enclosing
+  // function declares `Type& r` / `Type* p` / `Type v` become typed intents, resolved globally
+  // under the one-owner rule. Owners are collected from DEFINITIONS only (in-class bodies and
+  // out-of-line `Type::m` bodies), never from prototypes — the regex tier mints nodes on exactly
+  // the same rule, so a wired `to` always names a node that exists.
+  cpp: {
+    collectOwners(root) {
+      const methodsByClass = new Map();
+      walkTree(root, (n) => {
+        if (n.type !== 'function_definition') return;
+        const nm = cppFnName(n);
+        const owner = cppOwnerOf(n);
+        if (!nm || !owner) return;
+        const set = methodsByClass.get(owner) || new Set();
+        set.add(nm.name);
+        methodsByClass.set(owner, set);
+      });
+      return methodsByClass;
+    },
+    callSite(n) {
+      if (n.type !== 'call_expression') return null;
+      const fn = n.childForFieldName('function');
+      if (!fn || fn.type !== 'field_expression') return null; // `.` and `->` are one node type
+      const obj = fn.childForFieldName('argument'), prop = fn.childForFieldName('field')?.text;
+      if (!obj || !prop) return null;
+      return { obj, prop };
+    },
+    enclosingOf(n) {
+      const encl = upTo(n, CPP_FN); if (!encl) return null;
+      const nm = cppFnName(encl); if (!nm) return null;
+      return { owner: cppOwnerOf(encl), name: nm.name, methodNode: encl };
+    },
+    isSelf: (obj) => obj.type === 'this' || (obj.type === 'parenthesized_expression' && /^\(\s*\*\s*this\s*\)$/.test(obj.text)),
+    identName: (obj) => (obj.type === 'identifier' ? obj.text : null),
+    typedParams: {
+      paramType: 'parameter_declaration',
+      // C++ hangs `parameters` off the function_declarator inside the definition, not off the
+      // definition node — and the declarator may sit under pointer/reference wrappers.
+      paramsNode: (fn) => cppDeclCore(fn?.childForFieldName('declarator'))?.childForFieldName('parameters'),
+      entry(p) {
+        const ty = p.childForFieldName('type');
+        const nm = cppDeclCore(p.childForFieldName('declarator'));
+        // A `primitive_type` (int/double) names no class to dispatch on, and a template type has no
+        // single owner — both stay out. A `qualified_identifier` (`const geo::Shape&`) resolves to
+        // its TAIL: the leading scopes are namespaces, which are never symbols here, so the tail is
+        // the class exactly as the regex tier records it.
+        const tyName = ty?.type === 'type_identifier' ? ty.text
+          : ty?.type === 'qualified_identifier' ? cppQualTail(ty) : null;
+        return tyName && nm?.type === 'identifier' && BARE_TYPE.test(tyName)
+          ? { nm: nm.text, ty: tyName } : null;
+      },
+    },
+  },
+  // C — the function-pointer table. `collectOwners` here indexes FIELD BINDINGS rather than class
+  // members (one namespace per file, which is what a designated initializer scopes to), and
+  // `localTarget` resolves `ops.compute(v)` / `p->compute(v)` to whatever the initializer assigned.
+  // No typedParams: a `struct Ops *o` PARAMETER is not evidence — what it points at is the
+  // caller's runtime choice, so an unbound receiver wires nothing.
+  c: {
+    collectOwners(root) {
+      // field name -> implementation name, or AMBIGUOUS_BINDING once a second, different binding
+      // for the same field appears. Same rule the typed tiers use for a repeated class name: two
+      // candidates is a genuine ambiguity, and a guess would be worse than an absent edge.
+      const byField = new Map();
+      walkTree(root, (n) => {
+        if (n.type !== 'initializer_pair') return;
+        const target = cInitTarget(n.childForFieldName('value'));
+        if (!target) return;
+        // `.a.b = f` carries several designators; the LAST one names the field being assigned.
+        let field = null;
+        for (let i = 0; i < n.namedChildCount; i++) { const c = n.namedChild(i); if (c.type === 'field_designator') field = c.text.replace(/^\./, ''); }
+        if (!field || !BARE_TYPE.test(field)) return;
+        const prev = byField.get(field);
+        if (prev === undefined) byField.set(field, target);
+        else if (prev !== target) byField.set(field, AMBIGUOUS_BINDING);
+      });
+      return byField;
+    },
+    callSite(n) {
+      if (n.type !== 'call_expression') return null;
+      const fn = n.childForFieldName('function');
+      if (!fn || fn.type !== 'field_expression') return null; // `.` and `->` are one node type
+      const prop = fn.childForFieldName('field')?.text;
+      if (!prop) return null;
+      return { obj: fn.childForFieldName('argument'), prop };
+    },
+    enclosingOf(n) {
+      const encl = upTo(n, C_FN); if (!encl) return null;
+      const d = cppDeclCore(encl.childForFieldName('declarator'));
+      if (!d || d.type !== 'function_declarator') return null;
+      const id = cppDeclCore(d.childForFieldName('declarator'));
+      if (!id || id.type !== 'identifier') return null;
+      return { owner: null, name: id.text, methodNode: encl };
+    },
+    localTarget(site, ctx, bindings) {
+      const bound = bindings.get(site.prop);
+      return typeof bound === 'string' ? bound : null; // unbound or AMBIGUOUS_BINDING -> no edge
+    },
+    isSelf: () => false,
+    identName: () => null,
   },
   python: {
     collectOwners(root) {
@@ -703,6 +872,18 @@ const makeDispatchWalker = (parser, L) => (text, relPath) => {
       const site = L.callSite(n); if (!site) return;
       const ctx = L.enclosingOf(n); if (!ctx) return;
       const from = `${r}:${ctx.owner ? ctx.owner + '.' : ''}${ctx.name}`;
+      // A language whose in-file dispatch does not land on a sibling METHOD supplies `localTarget`
+      // and names its own callee label (C resolves a function-pointer field to a free function).
+      // Dedupe, ordering and endpoint guarding stay shared.
+      if (L.localTarget) {
+        const label = L.localTarget(site, ctx, owners);
+        if (label) {
+          const to = `${r}:${label}`;
+          const k = from + '\t' + to;
+          if (from !== to && !seen.has(k)) { seen.add(k); thisCalls.push({ from, to }); }
+        }
+        return;
+      }
       if (L.isSelf(site.obj, ctx)) {
         if (ctx.owner && owners.get(ctx.owner)?.has(site.prop)) {
           const to = `${r}:${ctx.owner}.${site.prop}`;
@@ -725,7 +906,7 @@ const makeDispatchWalker = (parser, L) => (text, relPath) => {
 
 const _langEngines = {}; // key -> undefined(not tried)/null(unavailable)/engine
 
-/** Lazily load the dispatch engine for any LANG_DISPATCH key (java/csharp/python/go/rust/ruby/php). Returns { extractDispatch } or null. */
+/** Lazily load the dispatch engine for any LANG_DISPATCH key (java/csharp/python/go/rust/ruby/php/cpp/c). Returns { extractDispatch } or null. */
 export async function loadLangEngine(key) {
   if (_langEngines[key] !== undefined) return _langEngines[key];
   try {

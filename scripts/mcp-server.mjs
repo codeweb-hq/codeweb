@@ -18,7 +18,7 @@
 // protocol, and every trace write is try/catch-guarded (a client may close stderr — the #29 lesson).
 
 import { createInterface } from 'node:readline';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeGraph, resolveSymbol, suggestSymbols, findingBuckets, bucketsLine } from './lib/graph-ops.mjs';
@@ -30,8 +30,11 @@ import { findSymbols } from './lib/find-core.mjs';
 import { buildBrief } from './lib/brief-core.mjs';
 import { buildCards } from './lib/explain-core.mjs'; // finding 20: explain's card assembler, in-process
 import { buildContextPack } from './lib/context-core.mjs'; // finding 20: context-pack's assembler, in-process
+import { qualifyInformation } from './lib/analysis-completeness.mjs';
 import { bump, attachActivity, receiptPayload } from './lib/stats.mjs';
 import { sourceReader, editDistance } from './lib/cli.mjs';
+import { BANDS, BODY_LINE_CAP } from './lib/shingles.mjs';
+import { hasEvidenceArguments, validateEvidenceArgs, evidenceCliArgs } from './lib/evidence-args.mjs';
 import { TOOL_SPECS, QUERY_TOOL_SPECS } from './lib/tool-specs.mjs'; // D1: THE tool-interface manifest
 import { discoverGraph, discoverUnsupported, NO_GRAPH, cachedGraph, staleOnce } from './lib/mcp-graphs.mjs'; // D2: graph serving state
 import { createWorkspaceQueue, queueKeyFor, WRITER_TOOLS } from './lib/mcp-queue.mjs'; // D2: the I1-I7 queue
@@ -54,8 +57,9 @@ const SPAWN_TIMEOUT_MS = 120_000; // a wedged child must not wedge the whole ses
 
 const INSTRUCTIONS = [
   'codeweb answers structural questions about a mapped repo (graph.json) deterministically — no LLM, ~100ms.',
-  'Loop: BEFORE editing a symbol call codeweb_context (bounded edit window) or codeweb_impact (blast radius).',
-  'AFTER editing call codeweb_refresh, then codeweb_diff (before vs after) to gate the edit.',
+  'Loop: BEFORE editing a symbol call codeweb_context (bounded edit window) or codeweb_impact (blast radius); codeweb_dependents lists mapped users of it (call+import+inherit+test+ref).',
+  'BEFORE editing call codeweb_refresh {baseline:true} once to capture a fresh baseline. AFTER editing call codeweb_diff {before:"baseline", refresh:true} to refresh and verify in one call. Ordinary/automatic refreshes preserve this baseline. Legacy refresh {snapshot:true} then diff {} remains available.',
+  'Optional evidence loop: codeweb_context {symbol, captureEvidence:true, task} captures a receipt using an isolated regex snapshot. After editing pass evidenceReceipt and the same task to codeweb_review. Inspect evidence.state separately from verdict; historical pages never imply current currency.',
   'Before WRITING a new function call codeweb_find_similar (does this exist?) and codeweb_placement (where does it belong?).',
   'Before a refactor, codeweb_simulate pre-flights a delete/merge/move; after verifying a finding is wrong, codeweb_annotate suppresses it so it stops resurfacing.',
   'No symbol name yet? codeweb_find turns a concept ("retry backoff") into ranked starting symbols.',
@@ -99,7 +103,13 @@ const STRUCTURAL_TOOLS = new Set([...Object.keys(QUERY_KIND), 'codeweb_find', 'c
 // structural tools (refresh preserves domains but drops overlaps, so overlap-consuming advisors
 // keep their input). Throttled per graph; CODEWEB_NO_AUTOREFRESH=1 disables; failure -> serve the
 // stale answer WITH its stale annotation (never a dead end).
-const AUTOREFRESH_TOOLS = new Set([...Object.keys(QUERY_KIND), 'codeweb_context', 'codeweb_explain', 'codeweb_find', 'codeweb_brief']);
+// AC-11: the overlap-INDEPENDENT advisors auto-refresh too — a deletion plan or refactor
+// pre-flight from a week-old map is the same trap the orient family already avoids. The
+// overlap-CONSUMING advisors (find_similar, campaign, codemod, review) stay out on purpose:
+// refresh drops overlaps, so an auto-refresh would destroy exactly the input they answer from —
+// they get the stale ANNOTATION (spawnedToolReply) instead, never a silent stale answer.
+const AUTOREFRESH_TOOLS = new Set([...Object.keys(QUERY_KIND), 'codeweb_context', 'codeweb_explain', 'codeweb_find', 'codeweb_brief',
+  'codeweb_deadcode', 'codeweb_risk', 'codeweb_hotspots', 'codeweb_break_cycles', 'codeweb_reading_order', 'codeweb_simulate', 'codeweb_placement', 'codeweb_fitness']);
 const refreshAttempt = new Map(); // abs graph path -> last attempt ms
 // #31 (T-31.2): autoRefresh joins the workspace queue as a WRITER — SKIP when the workspace already
 // has a writer queued or in-flight (writersPending > 0, read race-free per I7, so an explicit
@@ -135,11 +145,13 @@ function autoRefresh(absGraph) {
 const QUERY = scriptOf('query.mjs');
 const TOOL_BEHAVIOR = {
   codeweb_callers: (s) => ({ argv: (a) => ['--callers', a.symbol],
-    description: `Direct callers (call-edge in-neighbors) of a symbol. Budgeted: top ${s.budget.value} by default (full:true for all).` }),
+    description: `Direct callers (call-edge in-neighbors) of a symbol. For EVERY kind of user (imports, subclasses, tests, refs too) use codeweb_dependents. Budgeted: top ${s.budget.value} by default (full:true for all).` }),
+  codeweb_dependents: (s) => ({ argv: (a) => ['--dependents', a.symbol],
+    description: `"Who do I break?" — mapped users of a symbol in one answer: the union codeweb_callers cannot see (call + import + inherit + test + ref edges, each tagged by kind). Call BEFORE changing a symbol's contract or signature. Budgeted: top ${s.budget.value} by default (full:true for all).` }),
   codeweb_callees: (s) => ({ argv: (a) => ['--callees', a.symbol],
     description: `Direct callees (the functions a symbol calls). Budgeted: top ${s.budget.value} by default.` }),
   codeweb_impact: (s) => ({ argv: (a) => ['--impact', a.symbol],
-    description: `Blast radius: every function transitively affected by changing a symbol, plus the domains touched. Call this BEFORE editing a symbol. Budgeted: summary + top ${s.budget.value} by fan-in (count is the true total; full:true for every id).` }),
+    description: `Mapped transitive impact through supported graph edges, plus domains touched. Unmapped or dynamic relationships may be missing; this is source-graph evidence. Call BEFORE editing. Budgeted: summary + top ${s.budget.value} by fan-in (count is the mapped total; full:true for all mapped ids).` }),
   codeweb_cycles: (s) => ({ argv: () => ['--cycles'],
     description: `File-level dependency cycles (circular imports/calls). Budgeted: top ${s.budget.value} by default.` }),
   codeweb_orphans: (s) => ({ argv: () => ['--orphans'],
@@ -147,7 +159,7 @@ const TOOL_BEHAVIOR = {
   codeweb_tests: () => ({ argv: (a) => ['--tests', a.symbol],
     description: 'The tests that exercise a symbol (test-edge in-neighbors). Run the right subset after editing a symbol.' }),
   codeweb_diff: () => ({ queueFrom: (a) => a.after, argv: (a) => [a.before, a.after],
-    description: 'Structural delta + regression verdict between two graph.json snapshots (before vs after an edit): nodes/edges/cycles/overlaps/orphans added & removed, coupling delta, and ok:false with reasons on a regression. The CI gate\'s exact semantics (verdict.check: orphan-gate): a new cycle, a new confirmed duplication, or a NON-EXPORTED symbol newly losing every in-edge — exported ones are listed in verdict, flagged exempt. Call AFTER an edit to gate it.' }),
+    description: 'Structural delta + regression verdict between two graph.json snapshots (before vs after an edit): nodes/edges/cycles/overlaps/orphans added & removed, coupling delta, and ok:false with reasons on a regression. The CI gate\'s exact semantics (verdict.check: orphan-gate): a new cycle, a new confirmed duplication, or a NON-EXPORTED symbol newly losing every in-edge — exported ones are listed in verdict, flagged exempt. Call AFTER an edit to gate it. Both args are optional: `after` defaults to the discovered graph, `before` defaults to "prev" (the graph.prev.json that codeweb_refresh {snapshot:true} saves) — so refresh {snapshot:true} then diff {} completes the legacy loop. Prefer before:"baseline", refresh:true after capturing a pre-edit baseline: one queued action refreshes and compares; skipped analysis checks are labeled.' }),
   codeweb_explain: () => ({ argv: (a) => [a.symbol],
     description: '"Tell me about X before I touch it" in ONE ~1KB card: identity, role, signature, complexity, fan-in/out, tests, blast radius + domains, top-5 callers/callees, and any duplication/pattern findings it belongs to. Start here; drill down with impact/context/callers.' }),
   codeweb_brief: () => ({ argv: () => [],
@@ -161,13 +173,15 @@ const TOOL_BEHAVIOR = {
     valid: (a) => (a.bodies != null && a.bodies !== 'windows' && a.bodies !== 'full') ? `argument bodies must be "windows" or "full" (got ${JSON.stringify(a.bodies)})` : null,
     argv: (a) => [a.symbol, ...(a.bodies === 'full' ? ['--full-bodies'] : []), ...(a.window != null ? ['--window', String(a.window)] : [])],
     description: `Bounded edit window for a symbol in ONE call: its body, direct callers as CALL-SITE WINDOWS (±3 lines around each use — the lines that break if the contract changes), callees (location-only), and the impact set. Budgeted: ${s.budget.value} callers by default (full:true for the unabridged lists); bodies:"full" switches callers to whole caller bodies (large).` }),
-  codeweb_refresh: () => ({ argv: () => [],
-    description: 'Re-extract the graph from disk (meta.root) so mid-task queries reflect your edits, not a stale snapshot. Incremental; preserves domains, drops stale overlaps. Call AFTER you edit source and BEFORE re-querying impact/callers/context.' }),
+  codeweb_refresh: () => ({
+    valid: (a) => a.snapshot && a.baseline ? 'choose baseline:true BEFORE editing or snapshot:true AFTER editing, not both' : null,
+    argv: (a) => [...(a.snapshot ? ['--snapshot'] : []), ...(a.baseline ? ['--baseline'] : [])],
+    description: 'Re-extract the graph from disk (meta.root) so mid-task queries reflect your edits, not a stale snapshot. Incremental; preserves domains, drops stale overlaps. snapshot:true first saves the current graph as graph.prev.json, so codeweb_diff {} can gate the edit against it. Use baseline:true BEFORE editing to refresh and save graph.baseline.json, protected from ordinary/automatic refreshes. Then codeweb_diff {before:"baseline", refresh:true} verifies the edit. baseline:true explicitly replaces any earlier baseline.' }),
   codeweb_find_similar: () => ({
     valid: (a) => (a.signature || a.body) ? null : 'pass `signature` (a candidate signature) or `body` (a code snippet)',
     argv: (a) => a.body ? ['--stdin', ...(a.structural ? ['--structural'] : [])] : ['--signature', a.signature, ...(a.structural ? ['--structural'] : [])],
     input: (a) => a.body || undefined,
-    description: 'Before writing a function, ask "does something already do this?": ranks existing bodies by similarity to a candidate `signature` or `body` snippet. structural:true matches identifier-renamed (Type-2) clones. Call to AVOID re-implementing existing logic.' }),
+    description: `Before writing a function, rank mapped non-test function/method source candidates for comparison with a signature or body snippet (>=${BANDS.low * 100}% similarity; existing bodies limited to first ${BODY_LINE_CAP} lines, candidate uncapped). structural:true uses identifier-normalized shingles. Missing bodies and unmapped code may hide candidates; similarity does not establish equivalent behavior, novelty, or safe reuse. Inspect source and run relevant tests.` }),
   codeweb_placement: () => ({ argv: (a) => ['--calls', a.calls],
     description: 'Where a NEW symbol belongs: given the comma-separated ids/labels it will call, suggests the domain + file by callee gravity, and warns if it duplicates an existing symbol.' }),
   // FORMS F11: limit/full were advertised here but wired to nothing (no budget entry, no CLI
@@ -186,7 +200,7 @@ const TOOL_BEHAVIOR = {
   codeweb_break_cycles: (s) => ({ argv: () => [],
     description: `For each file dependency cycle, the cheapest dependency edge to sever — verified to actually break the cycle. Budgeted: top ${s.budget.value} cycles by default.` }),
   codeweb_deadcode: (s) => ({ argv: (a) => (a.all ? ['--all'] : []),
-    description: `Confidence-tiered dead-code: safe-to-delete vs review-first (test-guarded or entrypoint-like), each with its loc span. Budgeted: top ${s.budget.value} per tier by span (totals stay true; full:true for everything).` }),
+    description: `Mapped orphan candidates grouped by structural review flags, with source availability, incompleteness and freshness. Deletion safety is not established; unmapped calls may hide use. Budgeted: top ${s.budget.value} per tier by span (totals stay true; full:true for all mapped candidates).` }),
   // FORMS F12: `into` demoted to optional — the CLI picks the canonical survivor itself when
   // --into is omitted; a required field the engine can infer is form friction.
   codeweb_codemod: () => ({ argv: (a) => ['--merge', a.merge, ...(a.into ? ['--into', a.into] : [])],
@@ -194,7 +208,7 @@ const TOOL_BEHAVIOR = {
   codeweb_hotspots: (s) => ({ argv: (a) => (a.all ? ['--all'] : []),
     description: `Rank symbols by refactoring priority (complexity x fan-in x churn): where to focus first. Budgeted: top ${s.budget.value} with raw components.` }),
   codeweb_campaign: (s) => ({ argv: (a) => (a.all ? ['--all'] : []),
-    description: `One ordered, gated optimization worklist (dead-code deletes + verified cycle cuts + duplicate merges), pre-flighted so applying in order never introduces a cycle. Budgeted: top ${s.budget.value} ROI steps by default (\`budget\` N or full:true for the whole plan).` }),
+    description: `Ordered optimization candidates (orphan deletions, cycle cuts, duplicate merges), checked in a mapped-graph simulation for new cycles when applied in order. The simulation does not establish runtime safety or behavior. Budgeted: top ${s.budget.value} ROI steps by default (\`budget\` N or full:true for the whole plan).` }),
   // API F4: `scope` without `value` used to be silently DROPPED by argv() — the tool answered
   // the whole-repo question instead of the scoped one (the exact trap the CLI's --scope
   // enumeration hardened against, FORMS F8, resurrected one transport over). The messages speak
@@ -233,11 +247,20 @@ const TOOLS = TOOL_SPECS.map((s) => ({
 }));
 
 const PROP = {
+  captureEvidence: { type: 'boolean', const: true, description: 'Opt in to a task-owned evidence receipt from the isolated native regex snapshot profile; no bodies. Requires task.' },
+  task: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$', description: 'Explicit owner ID for evidence capture, review or a historical page; never inferred from the last call.' },
+  evidenceReceipt: { type: 'string', pattern: '^[a-f0-9]{64}$', description: 'Immutable local receipt ID returned by context capture.' },
+  evidenceResult: { type: 'string', pattern: '^[a-f0-9]{64}$', description: 'Immutable reconciliation result ID; requires parent receipt and section.' },
+  evidenceSection: { type: 'string', description: 'Historical receipt page: callers/callees/impact/questions. Result page: added/removed/witnessChanged/questions.' },
+  evidenceOffset: { type: 'integer', minimum: 0, description: 'Historical evidence page offset; follow nextOffset, pages never imply current currency.' },
   graph: { type: 'string', description: 'Path to graph.json. OPTIONAL — defaults to CODEWEB_WS or the nearest .codeweb/graph.json above cwd' },
   symbol: { type: 'string', description: 'A node id (file:label) or a bare label' },
   query: { type: 'string', description: 'Free-text concept ("retry backoff", "where is config parsed") — no symbol name needed' },
-  before: { type: 'string', description: 'Path to the BEFORE graph.json snapshot' },
-  after: { type: 'string', description: 'Path to the AFTER graph.json snapshot' },
+  before: { type: 'string', description: 'Path to the BEFORE graph.json snapshot. For codeweb_diff, "baseline" selects graph.baseline.json beside after; omitted defaults to "prev" (graph.prev.json, written by codeweb_refresh snapshot:true)' },
+  after: { type: 'string', description: 'Path to the AFTER graph.json snapshot. codeweb_diff only: OPTIONAL — defaults to the discovered graph' },
+  baseline: { type: 'boolean', description: 'BEFORE editing: refresh, then save graph.baseline.json. Explicitly replaces the previous baseline; ordinary refreshes never overwrite it.' },
+  refresh: { type: 'boolean', description: 'Refresh the after graph, then compare in one queued operation. Use before:"baseline" after capturing a baseline BEFORE editing.' },
+  snapshot: { type: 'boolean', description: 'First save the current graph as graph.prev.json — the default `before` side for codeweb_diff' },
   signature: { type: 'string', description: 'A candidate function signature to check for existing implementations' },
   body: { type: 'string', description: 'A candidate code snippet (function body) to check for existing implementations' },
   structural: { type: 'boolean', description: 'Match identifier-normalized skeletons (catches renamed/Type-2 clones)' },
@@ -293,6 +316,9 @@ const { enqueueChild, wsOf, inflight } = createWorkspaceQueue({ trace, begin: ()
 function handleMap(id, args, meta) {
   const target = resolve(args.target || process.cwd());
   if (!existsSync(target)) return errResult(id, `target not found: ${target}`); // sync validation stays PRE-enqueue
+  if (!args.out && statSync(target).isFile()) {
+    return errResult(id, `target is not a directory: ${target}; point target at the containing code directory (for example: target: ".").`);
+  }
   const out = resolve(args.out || join(target, '.codeweb'));
   const token = meta && meta.progressToken;
   const onStderr = (chunk) => {
@@ -330,14 +356,15 @@ function handleMap(id, args, meta) {
     }
     if (token !== undefined && token !== null) send({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken: token, progress: MAP_STAGES.length, total: MAP_STAGES.length, message: 'done' } });
     const graphPath = join(out, 'graph.json');
-    let stats = '';
+    let stats = '', analysis;
     try {
       const g = JSON.parse(readFileSync(graphPath, 'utf8'));
+      analysis = g.meta?.analysis;
       // ACTIVATION A4: same findings vocabulary as every other surface (raw overlap count read
       // as a contradiction next to the triple).
       stats = `${(g.nodes || []).length} symbols, ${(g.edges || []).length} edges, ${(g.domains || []).length} domains — ${bucketsLine(findingBuckets(g.overlaps))}`;
     } catch { stats = 'built (stats unreadable)'; }
-    reply(id, { content: [{ type: 'text', text: JSON.stringify({ ok: true, graph: graphPath, summary: `mapped ${target}: ${stats}`, artifacts: { report: join(out, 'report.html'), optimize: join(out, 'optimize.md') } }) }] });
+    reply(id, { content: [{ type: 'text', text: JSON.stringify({ ok: analysis?.status !== 'incomplete', ...(analysis ? { analysis } : {}), graph: graphPath, summary: `mapped ${target}: ${stats}`, artifacts: { report: join(out, 'report.html'), optimize: join(out, 'optimize.md') } }) }] });
   };
   // map is a WRITER keyed by resolve(out) — two maps on one out serialize; queued readers wait (I2).
   enqueueChild(id, { kind: 'writer', key: out, tool: 'codeweb_map', bin: scriptOf('run.mjs'), argv: [target, '--out-dir', out], stdio: ['ignore', 'ignore', 'pipe'], timeoutMs: 300_000, onStderr, onSettle });
@@ -349,9 +376,13 @@ function handleMap(id, args, meta) {
 // and an agent that obeyed got its argument rejected/ignored. The suffix rides only tools that
 // actually take `graph`; graphless children keep their own actionable stderr (which already names
 // the missing file and the rebuild command).
-const spawnedToolReply = (id, tool) => ({ code, out, errBuf, timedOut }) => {
+const spawnedToolReply = (id, tool, staleInfo) => ({ code, out, errBuf, timedOut }) => {
   if (timedOut) return errResult(id, `tool timed out after ${SPAWN_TIMEOUT_MS / 1000}s`);
-  if (code === 2 || code == null) {
+  let incompleteResult = false;
+  if (code === 2 && out) {
+    try { const p = JSON.parse(out); incompleteResult = p.status === 'inconclusive' || p.verdict?.status === 'inconclusive' || p.analysis?.status === 'incomplete'; } catch { /* usage/IO path */ }
+  }
+  if ((code === 2 && !incompleteResult) || code == null) {
     const text = (errBuf || 'query failed').trim() || 'query failed';
     return errResult(id, /graph not found/.test(text) && !(tool && tool.graphless) ? `${text}\n${NO_GRAPH}` : text);
   }
@@ -359,7 +390,20 @@ const spawnedToolReply = (id, tool) => ({ code, out, errBuf, timedOut }) => {
   // empty success here read as "no objections" right before a doomed refactor. Surface stderr.
   if (code === 1 && !(out || '').trim()) return errResult(id, (errBuf || '').trim() || 'tool failed (exit 1, no output)');
   // exit 0 (results) or 1 (found:false / gate-fail) both emit valid JSON on stdout — pass through.
-  reply(id, { content: [{ type: 'text', text: (out || '').trim() }] });
+  // AC-11: spawned advisors carry the same staleness honesty the fast paths do — the call-time
+  // verdict rides the reply (only when the child didn't already annotate; non-JSON passes through).
+  let text = (out || '').trim();
+  if (staleInfo && text.startsWith('{')) {
+    try {
+      const payload = JSON.parse(text);
+      if (payload && typeof payload === 'object' && !payload.stale) {
+        payload.stale = staleInfo;
+        if (typeof payload.summary === 'string') payload.summary += ` — graph is stale for ${staleInfo.count}+ file(s); run codeweb_refresh`;
+        text = JSON.stringify(payload);
+      }
+    } catch { /* non-JSON output: pass through untouched */ }
+  }
+  reply(id, { content: [{ type: 'text', text }] });
 };
 
 // ---- codeweb_diff fast path (#33) ------------------------------------------------------------
@@ -373,7 +417,22 @@ const spawnedToolReply = (id, tool) => ({ code, out, errBuf, timedOut }) => {
 // no child to kill, but a cancel while it awaits suppresses the reply. Any throw → the spawned
 // diff.mjs fallback (a reader job), whose stderr/exit-2 becomes the errResult — never invented text.
 function handleDiff(id, args, tool) {
-  const key = dirname(resolve(args.after)); // == queueKeyFor(diff) — the after-workspace
+  // AC-9: both args optional — the MCP-only loop closes here. `after` defaults to the discovered
+  // graph; `before` defaults to "prev", the graph.prev.json snapshot codeweb_refresh
+  // {snapshot:true} writes beside it. A missing snapshot gets an actionable remedy, not a wall.
+  const afterPath = args.after || discoverGraph();
+  if (!afterPath) return errResult(id, NO_GRAPH);
+  const afterAbs = resolve(afterPath);
+  const beforeArg = args.before || 'prev';
+  const beforeAbs = ['prev', 'baseline'].includes(beforeArg) ? join(dirname(afterAbs), `graph.${beforeArg}.json`) : resolve(beforeArg);
+  // AC-23: refresh+diff is ONE writer job; another workspace writer cannot land
+  // between extraction and comparison. Validate/load the baseline in the child after waiting.
+  if (args.refresh) return enqueueChild(id, {
+    kind: 'writer', key: dirname(afterAbs), tool: tool.name, bin: tool.bin,
+    argv: [beforeArg === 'baseline' ? 'baseline' : beforeAbs, afterAbs, '--refresh', '--json'],
+    stdio: ['ignore', 'pipe', 'pipe'], timeoutMs: SPAWN_TIMEOUT_MS, onSettle: spawnedToolReply(id, tool),
+  });
+  const key = dirname(afterAbs); // == queueKeyFor(diff) — the after-workspace
   const entry = { kill: () => {}, cancelled: false };
   inflight.set(id, entry);
   pendingAsync++;
@@ -382,15 +441,24 @@ function handleDiff(id, args, tool) {
     // runs between this -- and enqueueChild's ++, so stdin-close cannot exit in the gap.
     inflight.delete(id);
     pendingAsync--;
-    enqueueChild(id, { kind: 'reader', key, tool: tool.name, bin: tool.bin, argv: [args.before, args.after, '--json'], stdio: ['ignore', 'pipe', 'pipe'], timeoutMs: SPAWN_TIMEOUT_MS, onSettle: spawnedToolReply(id, tool) });
+    enqueueChild(id, { kind: 'reader', key, tool: tool.name, bin: tool.bin, argv: [beforeAbs, afterAbs, '--json'], stdio: ['ignore', 'pipe', 'pipe'], timeoutMs: SPAWN_TIMEOUT_MS, onSettle: spawnedToolReply(id, tool) });
   };
   const attempt = () => {
     if (entry.cancelled) { inflight.delete(id); asyncDone(); return; } // cancel while awaiting → suppress reply (I5)
+    // The snapshot-existence check runs AFTER the writer-tail await (not at call time): a
+    // refresh {snapshot:true} queued in the same batch writes graph.prev.json before this runs.
+    if (!existsSync(beforeAbs)) {
+      inflight.delete(id); asyncDone();
+      return errResult(id, beforeArg === 'prev'
+        ? `no snapshot at ${beforeAbs} — call codeweb_refresh {snapshot:true} first (it saves the pre-refresh graph there), or pass \`before\` explicitly`
+        : beforeArg === 'baseline' ? `no baseline at ${beforeAbs} — call codeweb_refresh {baseline:true} BEFORE editing; a lost pre-edit baseline cannot be reconstructed from edited source`
+        : `before graph not found: ${beforeAbs}`);
+    }
     let payload;
     try {
-      const before = normalizeGraph(JSON.parse(readFileSync(resolve(args.before), 'utf8'))); // NOT cached (temp snapshot must not evict the live graph)
-      const afterEntry = cachedGraph(resolve(args.after)); // re-stats + reloads on mismatch
-      payload = diffGraphs(before, afterEntry.graph, { names: { before: basename(args.before), after: basename(args.after) }, aIx: afterEntry.index }).payload;
+      const before = normalizeGraph(JSON.parse(readFileSync(beforeAbs, 'utf8'))); // NOT cached (temp snapshot must not evict the live graph)
+      const afterEntry = cachedGraph(afterAbs); // re-stats + reloads on mismatch
+      payload = diffGraphs(before, afterEntry.graph, { names: { before: basename(beforeAbs), after: basename(afterAbs) }, aIx: afterEntry.index }).payload;
     } catch { return spawnFallback(); }
     reply(id, { content: [{ type: 'text', text: JSON.stringify(payload) }] });
     inflight.delete(id); asyncDone();
@@ -429,6 +497,12 @@ function handleToolCall(id, params) {
     if (v === undefined || v === null) return errResult(id, `missing required argument: ${k}`);
     if (typeof v !== 'string') return errResult(id, `argument ${k} must be a string (got ${typeof v})`);
     if (v === '') return errResult(id, `argument ${k} must be non-empty`);
+  }
+  const evidenceMode = ['codeweb_context','codeweb_review'].includes(name) && hasEvidenceArguments(args);
+  if (evidenceMode) {
+    const problem = validateEvidenceArgs(name,args);
+    if(problem) return errResult(id,problem);
+    if(args.graph !== undefined && (typeof args.graph !== 'string' || !args.graph)) return errResult(id,'graph must be a non-empty string');
   }
   // FORMS F3: ONE clamp for every numeric param. Garbage ("abc" -> NaN) silently disabled the
   // budget the tool exists to protect; a negative value minted empty pages with a nextOffset:0
@@ -470,6 +544,24 @@ function handleToolCall(id, params) {
     else cliArgs.push(graphPath);
   }
 
+  // Evidence modes deliberately precede ordinary cache guards, default budgets and auto-refresh.
+  // Queue record writers explicitly without changing the ordinary context/review scheduling.
+  if (evidenceMode) {
+    const argv = tool.name === 'codeweb_context'
+      ? [graphPath,args.symbol,...evidenceCliArgs(args),'--json']
+      : [graphPath,...tool.argv(args),...evidenceCliArgs(args),'--json'];
+    return enqueueChild(id, {
+      kind: tool.name === 'codeweb_context' && args.evidenceReceipt ? 'reader' : 'writer',
+      key: queueKeyFor(tool,args,graphPath), tool:tool.name, bin:tool.bin, argv,
+      stdio:['ignore','pipe','pipe'], timeoutMs:SPAWN_TIMEOUT_MS,
+      onSettle: tool.name === 'codeweb_review' ? spawnedToolReply(id,tool) : ({code,out,errBuf,timedOut}) => {
+        if(timedOut || code == null) return errResult(id,timedOut ? 'evidence operation timed out' : 'evidence operation unavailable');
+        const text=(out || '').trim();
+        if(!text) return errResult(id,(errBuf || 'evidence operation unavailable').slice(0,1024));
+        reply(id,{content:[{type:'text',text}],...(code===2?{isError:true}:{})});
+      },
+    });
+  }
   if (graphPath) bump(resolve(graphPath), 'queriesServed'); // the receipt's denominator
   if (graphPath && AUTOREFRESH_TOOLS.has(tool.name)) autoRefresh(resolve(graphPath));
 
@@ -479,7 +571,8 @@ function handleToolCall(id, params) {
   // renders the empty verdict itself, and refresh/map are how the void gets filled.
   if (graphPath && STRUCTURAL_TOOLS.has(tool.name)) {
     try {
-      if (cachedGraph(resolve(graphPath)).graph.nodes.length === 0) {
+      const checkedGraph = cachedGraph(resolve(graphPath)).graph;
+      if (checkedGraph.nodes.length === 0) {
         return errResult(id, `the map at ${graphPath} is EMPTY (built with --allow-empty; no supported source found) — structural answers would be vacuous, not "0 findings". Re-map at the code root, or use the /codeweb agent fallback for non-native languages.`);
       }
     } catch { /* unreadable graph: each tool's own path reports it */ }
@@ -522,6 +615,7 @@ function handleToolCall(id, params) {
         if (remaining > 0) payload.more = { remaining, nextOffset: offset + items.length };
         const stale = staleOnce(resolve(graphPath), entry);
         if (stale) { payload.stale = stale; payload.summary += ` — graph is stale for ${stale.count}+ file(s); run codeweb_refresh`; }
+        qualifyInformation(payload, graph);
         return reply(id, { content: [{ type: 'text', text: JSON.stringify(payload) }] });
       }
     } catch { /* fall through to the spawned artifact */ }
@@ -539,12 +633,14 @@ function handleToolCall(id, params) {
         const suggestions = suggestSymbols(graph, args.symbol);
         const payload = { symbol: args.symbol, found: false, hint: `no symbol matches "${args.symbol}" — try codeweb_find "<free text>" (concept search, no name needed)${suggestions.length ? ' or a near-match below' : ''}` };
         if (suggestions.length) payload.suggestions = suggestions;
+        qualifyInformation(payload, graph);
         return reply(id, { content: [{ type: 'text', text: JSON.stringify(payload) }] });
       }
       const cards = buildCards(graph, index, sourceReader(graph.meta && graph.meta.root), ids);
       const payload = { symbol: args.symbol, matched: ids, cards, summary: cards.map((c) => c.summary).join(' | ') };
       const stale = staleOnce(resolve(graphPath), entry);
       if (stale) { payload.stale = stale; payload.summary += ` — graph is stale for ${stale.count}+ file(s); run codeweb_refresh`; }
+      qualifyInformation(payload, graph);
       return reply(id, { content: [{ type: 'text', text: JSON.stringify(payload) }] });
     } catch { /* fall through to the spawned artifact */ }
   }
@@ -560,6 +656,7 @@ function handleToolCall(id, params) {
         const suggestions = suggestSymbols(graph, args.symbol);
         const payload = { symbol: args.symbol, found: false, hint: `no symbol matches "${args.symbol}" — try codeweb_find "<free text>" (concept search, no name needed)${suggestions.length ? ' or a near-match below' : ''}` };
         if (suggestions.length) payload.suggestions = suggestions;
+        qualifyInformation(payload, graph);
         return reply(id, { content: [{ type: 'text', text: JSON.stringify(payload) }] });
       }
       const limit = args.limit != null ? Number(args.limit) : (args.full ? null : tool.budget.value);
@@ -608,6 +705,13 @@ function handleToolCall(id, params) {
     if (args.offset != null && (tool.opt || []).includes('offset')) cliArgs.push('--offset', String(args.offset));
   }
   const bin = tool.bin || QUERY;
+  // AC-11: compute the call-time staleness verdict for spawned graph-consuming tools so the reply
+  // shaper can annotate it (memoized per burst — staleOnce). refresh is the fix itself, stats is
+  // an activity receipt, annotate writes suppressions — none of them answers FROM the structure.
+  let staleForReply = null;
+  if (graphPath && !tool.graphless && !['codeweb_refresh', 'codeweb_stats', 'codeweb_annotate'].includes(tool.name)) {
+    try { staleForReply = staleOnce(resolve(graphPath), cachedGraph(resolve(graphPath))) || null; } catch { /* annotation is best-effort */ }
+  }
   // finding 19 + #30/#31/#32: spawned children are ASYNC and queue PER WORKSPACE (dir of graph.json /
   // map out / diff's `after`). spawnSync once blocked the readline loop, head-of-line-blocking every
   // queued request; fast-path tools answer in-process ABOVE and never queue. Readers on one workspace
@@ -621,7 +725,7 @@ function handleToolCall(id, params) {
     stdio: [tool.input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     input: tool.input ? (tool.input(args) || '') : undefined,
     timeoutMs: SPAWN_TIMEOUT_MS,
-    onSettle: spawnedToolReply(id, tool),
+    onSettle: spawnedToolReply(id, tool, staleForReply),
   });
 }
 

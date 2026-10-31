@@ -72,6 +72,161 @@ class TestAcPins(unittest.TestCase):
         self.assertIn("jsonFiles", extractor,
                       "the extractor enumerates .json into the resolution universe")
 
+    def test_ac_9_snapshot_diff_loop_wired(self):
+        suite = ROOT / "tests" / "mcp-snapshot-diff.test.mjs"
+        self.assertTrue(suite.exists(), "AC-9's check target must exist")
+        refresh = (ROOT / "scripts" / "refresh.mjs").read_text(encoding="utf-8")
+        self.assertIn("graph.prev.json", refresh,
+                      "refresh --snapshot preserves the pre-refresh graph")
+        server = (ROOT / "scripts" / "mcp-server.mjs").read_text(encoding="utf-8")
+        self.assertIn("graph.prev.json", server,
+                      "codeweb_diff defaults its before side to the snapshot")
+
+    def test_ac_10_dependents_tool_wired(self):
+        suite = ROOT / "tests" / "mcp-dependents.test.mjs"
+        self.assertTrue(suite.exists(), "AC-10's check target must exist")
+        specs = (ROOT / "scripts" / "lib" / "tool-specs.mjs") \
+            .read_text(encoding="utf-8")
+        self.assertIn("codeweb_dependents", specs,
+                      "the union answer is declared once, in the D1 manifest")
+
+    def test_ac_11_staleness_parity_wired(self):
+        suite = ROOT / "tests" / "mcp-staleness-parity.test.mjs"
+        self.assertTrue(suite.exists(), "AC-11's check target must exist")
+        server = (ROOT / "scripts" / "mcp-server.mjs").read_text(encoding="utf-8")
+        self.assertIn("staleForReply", server,
+                      "spawned advisor replies carry the call-time verdict")
+
+    def test_ac_13_shared_product_identity(self):
+        product = json.loads((ROOT / "site/data/product.json").read_text())
+        self.assertIn("See what your AI edits affect.", json.dumps(product))
+        self.assertIn("Structural checks for AI code changes.", PKG["description"])
+
+    def test_ac_14_setup_recipes_share_one_source(self):
+        build = (ROOT / "site/build.mjs").read_text()
+        self.assertIn("clientRecipes", build)
+        self.assertTrue((ROOT / "tests/product-clarity-setup-page.test.mjs").exists())
+
+    def test_ac_15_installed_command_dispatch(self):
+        for command in ("setup", "doctor", "review", "gate"):
+            proc = _run(["node", "bin/codeweb.mjs", command, "--help"])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_ac_16_review_evidence_and_html_wired(self):
+        source = (ROOT / "scripts/review.mjs").read_text()
+        self.assertIn("changeReviewEvidence", source)
+        self.assertIn("changeReviewHtml", source)
+        self.assertTrue((ROOT / "tests/product-clarity-review.test.mjs").exists())
+
+    def test_ac_17_finding_decisions_wired(self):
+        source = (ROOT / "scripts/build-report.mjs").read_text()
+        self.assertIn("findingDecision", source)
+        self.assertTrue((ROOT / "tests/product-clarity-findings.test.mjs").exists())
+
+    def test_ac_18_demo_has_source_and_engine_provenance(self):
+        graph = json.loads((ROOT / "docs/demo/axios.graph.json").read_text())
+        self.assertEqual(graph["meta"]["extractorVersion"], PKG["version"])
+        self.assertEqual(len(graph["meta"]["sourceCommit"]), 40)
+        self.assertNotIn("root", graph["meta"])
+
+    def test_ac_19_report_only_keeps_error_exit(self):
+        proc = _run(["node", "bin/codeweb.mjs", "gate", "--report-only", "--imaginary"])
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+
+    def test_ac_20_reproducible_demo_entry(self):
+        proc = _run(["node", "scripts/product-demo.mjs", "--help"])
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue((ROOT / "docs/guides/product-clarity-pilot.md").exists())
+
+    def test_ac_12_agent_provenance_wired(self):
+        suite = ROOT / "tests" / "agent-graph-label.test.mjs"
+        self.assertTrue(suite.exists(), "AC-12's check target must exist")
+        brief = (ROOT / "scripts" / "lib" / "brief-core.mjs") \
+            .read_text(encoding="utf-8")
+        self.assertIn("AGENT_ENGINES", brief,
+                      "the briefing reads the fallback's provenance stamp")
+
+    def test_ac_21_actionable_gate_comments(self):
+        proc = _run(["node", "--test", "tests/gate-md.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_22_context_analysis(self):
+        proc = _run(["node", "--test", "tests/context-analysis.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_23_edit_baseline(self):
+        proc = _run(["node", "--test", "tests/edit-baseline.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_24_setup_diagnostics(self):
+        proc = _run(["node", "--test", "tests/doctor.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_25_first_use_cycle(self):
+        proc = _run(["node", "--test", "tests/first-use-cycle.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_26_shipped_hooks_metadata(self):
+        proc = _run(["node", "--test", "tests/hooks-config.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_27_incomplete_analysis_containment(self):
+        proc = _run(["node", "--test", "tests/analysis-completeness.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_28_cli_file_target(self):
+        proc = _run(["node", "--test", "--test-name-pattern=ac_28", "tests/first-use-target.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_29_mcp_file_target(self):
+        proc = _run(["node", "--test", "--test-name-pattern=ac_29", "tests/first-use-target.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+
+    def test_ac_30_evidence_reconciliation(self):
+        proc = _run(["node", "--test", "tests/evidence-core.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_31_coherent_evidence_snapshot(self):
+        proc = _run(["node", "--test", "tests/evidence-snapshot.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_32_immutable_evidence_store(self):
+        proc = _run(["node", "--test", "tests/evidence-store.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_33_evidence_transport_parity(self):
+        proc = _run(["node", "--test", "tests/evidence-transport.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_34_bounded_similarity_output(self):
+        proc = _run(["node", "--test", "tests/find-similar-output.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_35_native_evidence_repairs(self):
+        proc = _run(["node", "--test", "tests/native-evidence-repairs.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_36_static_usage_correctness(self):
+        proc = _run(["node", "--test", "tests/static-usages.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_37_inversion_source_correctness(self):
+        proc = _run(["node", "--test", "tests/inversion-correctness.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_38_partial_information_transport(self):
+        proc = _run(["node", "--test", "tests/inversion-transport.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_39_codex_launch_recipes(self):
+        proc = _run(["node", "--test", "tests/codex-launch-recipes.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_ac_40_codex_workflow_package(self):
+        proc = _run(["node", "--test", "tests/codex-workflow-packaging.test.mjs"])
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

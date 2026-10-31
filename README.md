@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/brand/banner.png" alt="codeweb — your coding agents grep. codeweb knows." width="100%">
+<img src="assets/brand/banner.png" alt="codeweb — See what your AI edits affect." width="100%">
 
 [![CI](https://github.com/GhostlyGawd/codeweb/actions/workflows/ci.yml/badge.svg)](https://github.com/GhostlyGawd/codeweb/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40ghostlygawd%2Fcodeweb?style=flat-square&color=c6f24e)](https://www.npmjs.com/package/@ghostlygawd/codeweb)
@@ -8,45 +8,67 @@
 
 **Free & MIT-licensed. Runs entirely on your machine — no account, no server, no telemetry. Reads your code; never executes it.**
 
-**[Website](https://ghostlygawd.github.io/codeweb/)**&nbsp;·&nbsp;[See it in action](#see-it-in-action)&nbsp;·&nbsp;[Install](#install)&nbsp;·&nbsp;[Use](#use)&nbsp;·&nbsp;[For agents (MCP: Model Context Protocol)](#use-it-as-an-mcp-tool)&nbsp;·&nbsp;[How it works](#how-it-works)&nbsp;·&nbsp;[Changelog](CHANGELOG.md)
+**[Website](https://codeweb-hq.github.io/codeweb/)**&nbsp;·&nbsp;[Gate every PR](#gate-every-pull-request)&nbsp;·&nbsp;[See it in action](#see-it-in-action)&nbsp;·&nbsp;[Install](#install)&nbsp;·&nbsp;[Use](#use)&nbsp;·&nbsp;[For agents (MCP: Model Context Protocol)](#use-it-as-an-mcp-tool)&nbsp;·&nbsp;[How it works](#how-it-works)&nbsp;·&nbsp;[Free forever](#free-forever-and-where-the-paid-line-sits)&nbsp;·&nbsp;[Changelog](CHANGELOG.md)
 
 [![Try it with npx](https://img.shields.io/badge/Try_it_with_npx-060608?style=for-the-badge&logo=npm&logoColor=c6f24e)](#try-it-on-your-repo)
-[![Open the live demo](https://img.shields.io/badge/Open_the_live_demo-060608?style=for-the-badge&logoColor=c6f24e)](https://ghostlygawd.github.io/codeweb/demo/)
+[![Open the live demo](https://img.shields.io/badge/Open_the_live_demo-060608?style=for-the-badge&logoColor=c6f24e)](https://codeweb-hq.github.io/codeweb/demo/)
 [![Install the Claude Code plugin](https://img.shields.io/badge/Install_the_Claude_Code_plugin-060608?style=for-the-badge&logoColor=c6f24e)](#install)
 
 </div>
 
-**Your agents break less code and burn fewer tokens.**
+**See what your AI edits affect.**
 
 ```bash
 npx -y @ghostlygawd/codeweb .
 ```
 
 <div align="center">
-<a href="https://ghostlygawd.github.io/codeweb/downloads.html"><img src="assets/metrics/npm-downloads.svg" alt="Latest seven-day npm download total with a line chart of completed daily downloads for @ghostlygawd/codeweb, generated from the public npm downloads API" width="100%"></a>
+<a href="https://codeweb-hq.github.io/codeweb/downloads.html"><img src="assets/metrics/npm-downloads.svg" alt="Latest seven-day npm download total with a line chart of completed daily downloads for @ghostlygawd/codeweb, generated from the public npm downloads API" width="100%"></a>
 <br><sub>The large number is the latest seven completed days; the line shows daily downloads. Package downloads are retrievals, not a count of users. Select the chart for the live data and reporting cutoff.</sub>
 </div>
 
-codeweb reads your code. It maps each function and the calls between functions. It maps
+**Structural checks for AI code changes.** codeweb's gate builds
+the call graph before and after a change, then fails the pull request on three regressions: a new
+dependency cycle, a new body-confirmed duplication, or an existing non-exported symbol that
+becomes an orphan with no mapped callers. [Gate conditions and limits](docs/ci-gate.md).
+
+No LLM is in the checks. The gate uses zero model tokens for its static analysis.
+A passing check does not prove the program works. Analysis can miss dynamic relationships;
+inspect unresolved results and run the relevant tests. Pure removals pass the structural rules.
+
+The verdict uses the mapped graph, not a model, and costs zero LLM tokens. Exported symbols are exempt
+from the diff’s orphan check. Inspect `analysis.checks`: skipped
+checks are not passes, and refresh drops the evidence needed to evaluate duplication.
+
+A green result does not establish complete dependency coverage or behavioral correctness.
+Pure removals do not count as structural regressions.
+[Put it on your PRs →](#gate-every-pull-request)
+
+The gate needs a map to compare, and that map is worth reading on its own.
+
+codeweb reads your code. It maps supported functions and the calls it can resolve between them. It maps
 3,000 symbols in approximately 3 seconds. Static analysis produces the same map from the
 same code. No LLM is in the mapping loop.
 
+Static extraction can omit unsupported layouts,
+ambiguous calls, and runtime dispatch; the map is not a completeness guarantee.
+
 Your coding agents query the map instead of using grep. In measured tests, agents that used grep
 missed more than half of a function's real callers
-([see the measurements](https://ghostlygawd.github.io/codeweb/research.html)). An incomplete caller
+([see the measurements](https://codeweb-hq.github.io/codeweb/research.html)). An incomplete caller
 list can cause an agent to break code that it did not inspect.
 
-- **Give agents structural data:** The Model Context Protocol (MCP) server provides 27 tools,
+- **Give agents structural data:** The Model Context Protocol (MCP) server provides 28 tools,
   including `codeweb_impact`, `codeweb_callers`, and `codeweb_find_similar`.
 - **Keep answers small:** Each query returns a bounded structural answer. Your agents can use
   their remaining context for implementation work.
-- **Inspect the same data:** The interactive report shows the complete codebase map.
+- **Inspect the same data:** The interactive report shows the extracted codebase map.
 
 The map also shows relationships that are not visible in one file. These relationships include
 **duplicated logic, dead code, hotspots, and tangled domains**.
 
 <div align="center">
-<a href="https://ghostlygawd.github.io/codeweb/research.html"><img src="assets/brand/proof-strip.svg" alt="Measured codeweb results: agents found 74% of real callers with codeweb and 44% with grep at the same context spend; impact analysis used 126 times fewer tokens; more than 490,000 deterministic comparisons had zero disagreements" width="100%"></a>
+<a href="https://codeweb-hq.github.io/codeweb/research.html"><img src="assets/brand/proof-strip.svg" alt="Measured codeweb results: agents found 74% of real callers with codeweb and 44% with grep at the same context spend; impact answers had 126 times smaller context size than a simulated graph-assisted grep loop; more than 490,000 deterministic comparisons had zero disagreements" width="100%"></a>
 <br><sub>Measured against fixed tasks and independent oracles. Select the proof strip for the methodology and receipts.</sub>
 </div>
 
@@ -67,33 +89,54 @@ For a repository with 3,000 symbols, the first map takes approximately 3 seconds
 <br><sub>Real run against <a href="https://github.com/colinhacks/zod/tree/912f0f51b0ced654d0069741e7160834dca742ee">Zod at commit <code>912f0f5</code></a>, captured 2026-07-29. The replay shortens the absolute local path to <code>.codeweb</code>; the displayed values are unchanged.</sub>
 </div>
 
+## Gate every pull request
+
+From a Codeweb source checkout, run the verdict locally; the GitHub Action can run it on every pull request:
+
+```
+node scripts/ci-gate.mjs --base origin/main --target src   # exit 1 on a structural regression
+```
+
+The gate builds the graph from the pull request base and from its head, then diffs them. It posts
+a sticky structural review comment either way, so reviewers see the blast radius without
+installing anything.
+
+**Pin the Action to a release tag**, not a moving branch: a floating ref can change your gate's
+verdict semantics under you. Pin `codeweb-ref` to the same tag so the engine is fixed too. The
+workflow YAML, the monorepo matrix form, and every input live in
+[`docs/ci-gate.md`](docs/ci-gate.md).
+
+Want the gate hosted — no workflow YAML, cached base graphs, and history across every repo in the
+org? That is the planned scope of [codeweb Teams](https://codeweb-hq.github.io/codeweb/pricing.html), the paid half of
+[the boundary](#free-forever-and-where-the-paid-line-sits). Running it yourself stays free forever.
+
 ## See it in action
 
-Each screenshot below shows a generated report for **axios** (274 symbols and 8 domains).
+Each screenshot below shows a generated report for **axios** (280 symbols, 7 domains).
 The screenshots are not mockups.
 
 codeweb found 3 real duplications in axios and rejected 12 false positives. Read
 [the case study](docs/case-study-axios.md), or
-[inspect the live map](https://ghostlygawd.github.io/codeweb/demo/).
+[inspect the live map](https://codeweb-hq.github.io/codeweb/demo/).
 
 ### Know what an edit breaks — before you write
 
-Select a function in the [live map](https://ghostlygawd.github.io/codeweb/). The map highlights
+Select a function in the [live map](https://codeweb-hq.github.io/codeweb/). The map highlights
 the function's **blast radius** and shows the symbols that the change can affect.
 
 Your agents can get the same answer from the `codeweb_impact` MCP tool before they edit the code.
 
 <div align="center">
-<img src="assets/screens/axios-blast-radius.png" alt="codeweb blast radius: AxiosError selected in the axios graph — the selected block wears the accent with a viewfinder frame, blast edges lit across three domains, 27 callers listed in the inspector" width="760">
-<br><sub>Selecting <code>AxiosError</code> in axios lights up its <b>27 callers across the domains that depend on it</b> — try it yourself in the <a href="https://ghostlygawd.github.io/codeweb/">living map</a>.</sub>
+<img src="assets/screens/axios-blast-radius.png" alt="codeweb blast radius: AxiosError selected in the axios graph, with its mapped users highlighted in the inspector" width="760">
+<br><sub><code>AxiosError</code> has <b>20 callers across the domains that depend on it</b>; reference and import users are separate mapped relationships. Explore them in the <a href="https://codeweb-hq.github.io/codeweb/">living map</a>.</sub>
 </div>
 
 ### Navigate the whole system
 
-The force-directed map shows every symbol. You can collapse symbols into domains. Search, drag,
+The force-directed map shows the extracted symbols. You can collapse symbols into domains. Search, drag,
 zoom, or select a node to trace its callers and dependencies.
 
-<img src="assets/screens/axios-graph.png" alt="codeweb Graph tab on axios: eight domain blocks (helpers, core, adapters, cancel, defaults, platform) sized by symbol count and linked by stippled call edges" width="100%">
+<img src="assets/screens/axios-graph.png" alt="codeweb Graph tab on axios: domain blocks (helpers, core, adapters, cancel, defaults, platform) sized by symbol count and linked by stippled call edges" width="100%">
 
 ### Findings — stop guessing what to refactor
 
@@ -133,12 +176,12 @@ a merge.
 
 ## Benchmarks
 
-- **Find callers before an edit:** Agents found **74%** of a function's real callers with
-  codeweb and **44%** with grep at the same context spend. A missed caller can cause an edit to
-  break working code.
-- **Calculate the effect of a change:** One codeweb call returned one small answer. Agents that
-  used grep needed approximately 5 search rounds and **126 times the tokens**. They still had to
-  guess.
+- **Find callers before an edit:** In the v0.9.0 efficiency pilot, agents found **74%** of a
+  function's real callers with codeweb and **44%** with grep at the same context spend. A missed
+  caller can cause an edit to break working code.
+- **Calculate the effect of a change:** One codeweb call returned one small answer. A simulated
+  graph-assisted grep loop used **126 times the context size** in the recorded comparison.
+  This measures context-size differences, not total agent-session token savings.
 - **Detect duplicate code:** codeweb found **every planted duplicate with zero false alarms**,
   including renamed copies. Text search found 0% of the renamed copies.
 - **Check deterministic results:** Tests compared codeweb with the TypeScript compiler and other
@@ -150,11 +193,11 @@ a merge.
   completed simple tasks successfully without codeweb.
 
 Methodology, raw data, and per-claim receipts:
-[the evidence ledger](https://ghostlygawd.github.io/codeweb/research.html). Benchmark your own
-repo: `npm run bench -- <path>/.codeweb/graph.json`. CI re-runs the performance budgets on
+[the evidence ledger](https://codeweb-hq.github.io/codeweb/research.html). Benchmark your own
+repo from a Codeweb source checkout: `npm run bench -- <path>/.codeweb/graph.json`. CI re-runs the performance budgets on
 every PR; breaking a published number fails the build.
 
-codeweb also keeps a local activity tally. Run `npm run stats` to see it:
+codeweb also keeps a local activity tally. From a Codeweb source checkout, run `npm run stats` to see it:
 
 ```
 codeweb this month: 41 pre-edit card(s) · 5 card-named caller(s) followed · 2 regression(s) flagged · 120 queries served
@@ -176,18 +219,37 @@ your code; never executes it.**
 - CI publishes releases with **npm provenance**. Run `npm audit signatures` to verify a release.
 
 **Using Claude Code?** Install the plugin to add the `/codeweb` command, automatic pre-edit
-impact cards, and all 27 tools:
+impact cards, and all 28 tools:
 ```
 /plugin marketplace add GhostlyGawd/codeweb
 /plugin install codeweb
 ```
 Restart Claude Code to register the `/codeweb` command, agents, and skill.
 
-**Cursor, Windsurf, or another MCP agent:** Register the zero-dependency stdio server. The example
-uses Claude Code syntax. Use the equivalent server-registration command for your client:
+**Using Codex?** Install the bundled coding skill and local MCP server:
+```bash
+codex plugin marketplace add GhostlyGawd/codeweb
+codex plugin add codeweb@codeweb
 ```
-claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp
+Reload Codex, then use `$codeweb` to inspect callers before an edit, compare existing
+implementations, or review a structural change. The plugin uses your existing tool permissions.
+
+The plugin/MCP workflow is verified with Codex CLI 0.159.2 and 0.160.0. If a client does not expose
+bundled tools, use the standalone MCP recipe below with the coding skill. Manage each configured
+entry when disabling or removing Codeweb. This workflow does not claim automatic hook delivery.
+
+**Choose your MCP client:** [The setup page](https://codeweb-hq.github.io/codeweb/start.html#other-clients)
+provides one recipe for Claude Code, Cursor, Windsurf, Gemini CLI, or Codex. Print a recipe
+and check local setup from your project:
+
+```bash
+npx -y @ghostlygawd/codeweb setup --client cursor
+npx -y @ghostlygawd/codeweb doctor
 ```
+
+Setup prints configuration without replacing files. Doctor checks the local server and graph;
+a successful local check does not prove an editor connection. Restart your client, ask your
+agents to run `codeweb_callers`, and check a returned source location.
 
 **Map a repository without an AI agent:** Run one command from your project directory:
 ```
@@ -247,14 +309,47 @@ You can open `report.html`. codeweb also creates Markdown versions.
 ## Use it as an MCP tool
 
 `scripts/mcp-server.mjs` is a zero-dependency Model Context Protocol (MCP) stdio server. It gives
-each MCP client access to all **27 tools**. The tools help the client orient, read the structure,
+MCP clients access to **28 tools**. The tools help the client orient, read the structure,
 check before writing, gate an edit, and plan cleanup.
+
+The September 14 packaged assessment
+exercised the baseline loop with Codex CLI 0.154.0; it did not certify every tool in every
+client. Claude runtime compatibility and other clients were not tested in that assessment.
+See [the recorded scope](reports/paperclip-pilot/readiness-01/PACKAGED-ACCEPTANCE.md).
 
 **The plugin registers the server automatically.** To register the standalone server, run:
 
 ```
 claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp
 ```
+
+**Requires Codeweb 0.15.0 or later.** Use the installed MCP server, or register a source
+checkout using its absolute path as shown in the [reference](docs/reference.md#the-mcp-server-tool-by-tool).
+
+The loop an agent runs:
+
+1. Orient with `codeweb_brief` (or `codeweb_find` when no symbol name is known).
+2. **Before editing**, call `codeweb_refresh {baseline:true}` once to capture fresh source.
+   Ask `codeweb_explain`, then `codeweb_context`, `codeweb_impact`, or `codeweb_dependents`
+   about the symbol before changing it.
+3. **After editing**, call `codeweb_diff {before:"baseline",refresh:true}`.
+4. If red, repair the code and repeat that same diff against the **same baseline**.
+   Do not capture another baseline during repair: `baseline:true` replaces the original.
+   Ordinary and automatic refreshes preserve it. Start a new baseline for the next task.
+
+Known unsupported same-line JS/TS declarations produce `status: "inconclusive"` and
+`ok:false` instead of a clean gate. Inspect the diagnostic locations and callers in source.
+The detector covers known layouts; no diagnostic does not prove complete extraction.
+
+Read `analysis.checks`: a skipped check is not a pass. Refresh drops overlap evidence, so
+this loop does not evaluate duplication; structural green does not prove behavioral
+correctness. Run the project's tests too. If the baseline is missing, edited source cannot
+reconstruct it — recover the pre-edit source before beginning again.
+
+For npm v0.14.0, use the [snapshot quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart).
+For the unreleased checkout, try the [tiny cycle → repair → green walkthrough](https://codeweb-hq.github.io/codeweb/start.html#cycle-walkthrough).
+Clients that hide the server's built-in instructions can paste
+[the rules snippet](https://codeweb-hq.github.io/codeweb/start.html#rules-snippet) instead.
 
 The server includes these agent-specific features:
 
@@ -263,15 +358,15 @@ The server includes these agent-specific features:
 - **Budgeted responses:** Responses include the highest-ranked items and the true totals. A context
   response that was approximately 300 KB is now approximately 10 KB.
 - **Staleness information:** A stale result identifies its state and directs the agent to
-  `codeweb_refresh`.
+  `codeweb_refresh` — on the orient tools and on every spawned advisor answer.
 
-[All 27 tools, grouped and explained →](docs/reference.md#the-mcp-server-tool-by-tool)
+[All 28 tools, grouped and explained →](docs/reference.md#the-mcp-server-tool-by-tool)
 
 ## How it works
 
-For JavaScript, TypeScript, Python, Rust, Go, Java, C#, Ruby, PHP, Kotlin, and Swift, codeweb uses
-a **deterministic Node pipeline** by default. One command creates the map. No LLM is in the
-pipeline, and the same input produces the same bytes.
+For JavaScript, TypeScript, Python, Rust, Go, Java, C#, Ruby, PHP, Kotlin, Swift, C, and C++,
+codeweb uses a **deterministic Node pipeline** by default. One command creates the map. No LLM is
+in the pipeline, and the same input produces the same bytes.
 
 The map pipeline has the four stages in the following diagram. `scripts/run.mjs` also creates
 `optimize.md` after overlap analysis and before report rendering.
@@ -303,24 +398,33 @@ then assigns domains and overlaps.
 Both paths produce the same `graph.json` schema. In **external** mode, each path also adds an
 adoption verdict.
 
-Curious how the repo is laid out? [The component map lives in the
-reference.](docs/reference.md#components)
+**Versus a language server (LSP):** an LSP answers one hop on demand — definitions, direct
+references — inside an editor session. codeweb builds one deterministic whole-graph artifact:
+transitive impact, duplication with body evidence, dead code, and domain coupling.
+
+Agents query that artifact over MCP, and CI diffs it to gate a PR. The two compose — codeweb
+replaces the grep loop, not your language server.
+
+Choose a reading path in the [documentation index](docs/README.md), which also explains
+repository ownership. [The component map](docs/reference.md#components) details the engine.
 
 ## Roadmap
 
-- **Support more first-class languages:** codeweb currently supports eleven native languages:
+- **Support more first-class languages:** codeweb currently supports thirteen native languages:
   JavaScript, TypeScript, Python, **Rust**, **Go**, **Java**, **C#**, **Ruby**, **PHP**, **Kotlin**,
-  and **Swift**. Other languages use the agent fallback. Dynamic-dispatch AST tiers cover JS/TS,
-  Java, C#, Python, Go, Rust, **Ruby**, and **PHP**. Kotlin and Swift dispatch requires a trusted
-  wasm grammar at the pinned ABI. See `scripts/grammars/PROVENANCE.md`.
+  **Swift**, **C**, and **C++**. Other languages use the agent fallback. Dynamic-dispatch AST tiers
+  cover JS/TS, Java, C#, Python, Go, Rust, **Ruby**, **PHP**, **C**, and **C++**. Kotlin and Swift
+  dispatch requires a trusted wasm grammar at the pinned ABI. See `scripts/grammars/PROVENANCE.md`.
 
 _Recent releases added the agent-intelligence suite (**hotspots**, **campaign**,
 **reading-order**, Type-2 clone detection, and suppression memory), a
-**[live interactive demo](https://ghostlygawd.github.io/codeweb/demo/)**, Go and Rust on the fast
+**[live interactive demo](https://codeweb-hq.github.io/codeweb/demo/)**, Go and Rust on the fast
 path, duplication trend data, and the one-command CI regression gate with a GitHub Action.
-codeweb currently provides 27 tools._
+codeweb currently provides 28 tools._
 
 ## Versioning & releases
+
+The maintenance commands below require a Codeweb source checkout.
 
 codeweb follows [Semantic Versioning](https://semver.org/). It records changes in
 [`CHANGELOG.md`](CHANGELOG.md), which uses the
@@ -338,7 +442,7 @@ npm run build:site          # regenerate the docs/ website (zero-dependency, det
 npm run release -- --minor  # roll the changelog, bump, sync, rebuild; prints the git/tag steps
 ```
 
-`check-consistency` runs in CI. It gates version strings on every surface, every prose mention of
+`check-consistency` runs in CI. It gates version strings on every surface, recognized prose patterns for
 the tool and language counts, the CHANGELOG entry for the current version, and every evidence
 file the ledger cites.
 
@@ -351,15 +455,32 @@ problems. Use [`SECURITY.md`](SECURITY.md) to report a security issue.
 **Stay current:** codeweb does not contact an update service. To receive release notifications,
 select **Watch → Custom → Releases** on GitHub.
 
-## Support the project
+## Free forever, and where the paid line sits
 
-Everything that runs locally is **free forever**. It does not require an account, telemetry, or a
-license key.
+The rule, ratified in [`CHARTER.md`](CHARTER.md): **anything that runs on one laptop against one
+repo is free forever; money buys hosting, multi-repo aggregation, and human attention.**
+
+Everything in this repository is that free half — the map, the MCP tools, the hooks, the report,
+the CLI, the self-hosted gate Action, and every language codeweb learns. MIT, no accounts, no
+telemetry, no license keys. Nothing here moves behind a payment later.
+
+The planned paid half is a separate hosted service, **codeweb Teams**: the gate run for you, and history
+held across every repo in an org. Billing lives only in that service, so a payment problem
+degrades the hosted tier and **never breaks** your local tooling or your CI.
+
+Hosted availability is not established by this repository’s local checks. The pricing page
+retains the sign-up doorway.
+
+Read the full contract on
+[the boundary page](https://codeweb-hq.github.io/codeweb/boundary.html), and the planned Teams
+price on [the pricing page](https://codeweb-hq.github.io/codeweb/pricing.html).
+
+## Support the project
 
 [Sponsoring](https://github.com/sponsors/GhostlyGawd) supports the project. Sponsorship also
 provides advertising. Top sponsors can put their logo at the top of this README, and each sponsor
 can join the supporters list. See the
-[support page](https://ghostlygawd.github.io/codeweb/support.html) for details.
+[support page](https://codeweb-hq.github.io/codeweb/support.html) for details.
 
 Running codeweb at an organization and need help? Send email through the GitHub profile.
 

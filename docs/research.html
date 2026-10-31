@@ -4,22 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Research, benchmarks &amp; the honest claim ledger — codeweb</title>
-<meta name="description" content="A pre-registered effectiveness study (32/33 checks), an efficiency pilot, and an honest claim ledger: what is validated, what is preliminary, and what is a null result.">
+<meta name="description" content="A pre-registered effectiveness study (32 checks, all 32 passing), an efficiency pilot, and an honest claim ledger: what is validated, what is preliminary, and what is a null result.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="codeweb">
 <meta property="og:title" content="codeweb — the evidence">
-<meta property="og:description" content="A pre-registered effectiveness study (32/33 checks), an efficiency pilot, and an honest claim ledger: what is validated, what is preliminary, and what is a null result.">
-<meta property="og:url" content="https://ghostlygawd.github.io/codeweb/research.html">
-<meta property="og:image" content="https://ghostlygawd.github.io/codeweb/assets/og.jpg">
+<meta property="og:description" content="A pre-registered effectiveness study (32 checks, all 32 passing), an efficiency pilot, and an honest claim ledger: what is validated, what is preliminary, and what is a null result.">
+<meta property="og:url" content="https://codeweb-hq.github.io/codeweb/research.html">
+<meta property="og:image" content="https://codeweb-hq.github.io/codeweb/assets/og.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="codeweb — interactive call-graph map of a codebase">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="google-site-verification" content="XtDZ8jymdrgm7ImH0L2hdtJ9Axy_B-9EnzLZk9pUMkQ">
 <meta name="theme-color" content="#060608">
-<link rel="canonical" href="https://ghostlygawd.github.io/codeweb/research.html">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"codeweb","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux (Node.js >= 22)","softwareVersion":"0.12.0","description":"Deterministic call/import graph of your codebase — 27 MCP tools for coding agents plus a self-contained interactive map. Runs entirely locally; reads code, never executes it.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/GhostlyGawd/codeweb","url":"https://ghostlygawd.github.io/codeweb/","sameAs":["https://github.com/GhostlyGawd/codeweb","https://www.npmjs.com/package/@ghostlygawd/codeweb"]}</script>
+<link rel="canonical" href="https://codeweb-hq.github.io/codeweb/research.html">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"codeweb","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux (Node.js >= 22)","softwareVersion":"0.16.0","description":"Deterministic call/import graph of your codebase — 28 MCP tools for coding agents plus a self-contained interactive map. Runs entirely locally; reads code, never executes it.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/GhostlyGawd/codeweb","url":"https://codeweb-hq.github.io/codeweb/","sameAs":["https://github.com/GhostlyGawd/codeweb","https://www.npmjs.com/package/@ghostlygawd/codeweb"]}</script>
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -30,13 +30,18 @@
     <span class="wm">code<span class="w">web</span></span>
   </a>
   <nav class="nav-links" aria-label="Primary">
-    <a href="index.html" data-nav="home">Home</a>
     <a href="product.html" data-nav="product">Product</a>
-    <a href="research.html" data-nav="research" aria-current="page">Research</a>
-    <a href="start.html" data-nav="start">Get Started</a>
-    <a href="changelog.html" data-nav="changelog">Changelog</a>
+    <a href="research.html" data-nav="research" aria-current="page">Evidence</a>
+    <a href="start.html" data-nav="start">Get started</a>
   </nav>
   <div class="nav-right">
+    <details class="nav-more">
+      <summary>Plans</summary>
+      <div class="nav-menu">
+        <a href="boundary.html" data-nav="boundary">Free forever</a>
+        <a href="pricing.html" data-nav="pricing">Teams pricing intent</a>
+      </div>
+    </details>
     <a class="nav-ghost" href="demo/">Live demo</a>
     <a class="btn" href="https://github.com/GhostlyGawd/codeweb" rel="noopener">GitHub</a>
   </div>
@@ -48,12 +53,12 @@
     <div class="section-head">
       <span class="eyebrow">Research</span>
       <h1>Does codeweb work? We pre-registered the answer.</h1>
-      <p class="lead">Before collecting any data, we wrote down 33 pass/fail checks across determinism, correctness, detection accuracy, performance, and agent outcomes — then ran them against six real repositories pinned by SHA and independent reference implementations. The raw data is committed in the repo.</p>
+      <p class="lead">Before collecting any data, we wrote down pass/fail checks across determinism, correctness, detection accuracy, performance, and agent outcomes — then ran them against six real repositories pinned by SHA and independent reference implementations. 32 checks measure code that still ships, and all 32 pass. The raw data is committed in the repo.</p>
     </div>
     <div class="stat-strip">
       <div class="stat">
         <div class="num">126×</div>
-        <div class="label">cheaper 'what breaks if I change this' answers — one call vs grepping in rounds</div>
+        <div class="label">smaller measured context size than a simulated graph-assisted grep loop; not total session savings</div>
         <div class="src">oracle-ab.json</div>
       </div>
       <div class="stat">
@@ -66,6 +71,7 @@
         <div class="label">of a function's callers found by AI agents — grep vs codeweb, same context budget (v0.9.0 pilot)</div>
         <div class="src">efficiency-pilot.reps5-v090.json</div>
       </div></div>
+    <p class="figcap" style="margin-top:var(--s-3)">Receipts are frozen files, not live counters: the ledger below was last re-baselined 2026-07-23, and the efficiency pilot ran on v0.9.0. Every claim links its committed source.</p>
   </div>
 </section>
 
@@ -76,7 +82,7 @@
       <h2>Designed to resist reward hacking</h2>
     </div>
     <div class="grid cols-2">
-      <div class="card"><h3>Pre-registered</h3><p>The 33 checks and their pass criteria were fixed in writing before data collection — so the bar couldn't move to fit the result.</p></div>
+      <div class="card"><h3>Pre-registered</h3><p>The checks and their pass criteria were fixed in writing before data collection — so the bar couldn't move to fit the result. One check was retired when the feature it measured was deleted; the remaining 32 all pass.</p></div>
       <div class="card"><h3>Independent oracles</h3><p>Cycles, impact, and callers are checked against separate implementations (Kosaraju SCC, reverse-BFS, an edit applier) — not against codeweb's own logic.</p></div>
       <div class="card"><h3>Frozen truth</h3><p>The efficiency pilot grades agents against a hand-verified caller set, reconciled with an exhaustive independent grep. Coverage gaps count against codeweb, honestly.</p></div>
       <div class="card"><h3>A/B levers</h3><p>Every bug fix sits behind a reproducible legacy lever, so re-running proves the fix is load-bearing rather than coincidental.</p></div>
@@ -102,7 +108,7 @@
         <td><span class="chip chip-validated">Validated</span></td>
       </tr>
       <tr>
-        <td class="claim">Blast-radius context cost vs recursive grep</td>
+        <td class="claim">Blast-radius context-size comparison with simulated recursive grep</td>
         <td class="num">~1KB/call vs ~130KB (126x), grep loop simulated generously (graph-assisted frontier)</td>
         <td class="muted">30 vite symbols, mean impact 18 symbols</td>
         <td class="src">oracle-ab.json</td>
@@ -166,13 +172,13 @@
       </tr>
       <tr>
         <td class="claim">Sub-quadratic scaling</td>
-        <td class="num">exponent b=0.33, CI [0.13, 0.53]</td>
-        <td class="muted">100–3,201 symbols</td>
+        <td class="num">exponent b=0.34, CI [0.11, 0.57]</td>
+        <td class="muted">100–3,215 symbols</td>
         <td class="src">performance.json</td>
         <td><span class="chip chip-validated">Validated</span></td>
       </tr>
       <tr>
-        <td class="claim">Zero runtime dependencies</td>
+        <td class="claim">Zero required dependencies</td>
         <td class="num">full pipeline runs on empty node_modules</td>
         <td class="muted">non-vacuity control passes</td>
         <td class="src">performance.json</td>
@@ -180,14 +186,14 @@
       </tr>
       <tr>
         <td class="claim">Multi-language extraction parity</td>
-        <td class="num">11 native languages (JS/TS/Py/Rust/Go receipts; Java/C#/Ruby/PHP/Kotlin/Swift pinned by per-language suites)</td>
-        <td class="muted">per-language fixtures (JS/TS/Py/Rust/Go receipts; the rest pinned by tests/lang-*.test.mjs)</td>
+        <td class="num">13 native languages (JS/TS/Py/Rust/Go receipts; Java/C#/Ruby/PHP/Kotlin/Swift/C/C++ pinned by per-language suites)</td>
+        <td class="muted">per-language fixtures (JS/TS/Py/Rust/Go receipts; the rest pinned by tests/lang-*.test.mjs and tests/extract-c*.test.mjs)</td>
         <td class="src">auxiliary.json</td>
         <td><span class="chip chip-validated">Validated</span></td>
       </tr>
       <tr>
         <td class="claim">MCP tool / CLI parity</td>
-        <td class="num">27 / 27 tools</td>
+        <td class="num">28 / 28 tools</td>
         <td class="muted">JSON-RPC conformance (suite: tests/mcp.test.mjs)</td>
         <td class="src">auxiliary.json</td>
         <td><span class="chip chip-validated">Validated</span></td>
@@ -289,11 +295,25 @@
       <h2>What we deliberately don't claim</h2>
       <p class="lead">The fastest way to lose trust is to overstate. Here's where we hold back, and the precise claim we make instead.</p>
     </div>
-    <div class="callout honesty"><ul><li><strong>"Finds all clones / 100% recall"</strong> → High-precision, body-confirmed overlap on the clones it surfaces (F1 1.0 synthetic, 0.98 on real axios) — it deliberately drops ambiguous edges because a false positive costs more than a miss.</li><li><strong>"Replaces human review"</strong> → It produces candidate lists and shows which merges are cycle-safe to apply — a structural pre-flight, not a semantic verdict.</li><li><strong>"Agents provably edit better"</strong> → It improves caller-discovery recall (+0.31, all reps positive) at equal token cost on the budgeted responses agents receive (v0.9.0). An earlier run on a different base model also showed ~34% fewer steps; that savings did not replicate, and we say so. The full edit-quality A/B (H18) was a null on clean tasks — a floor effect, reported honestly.</li><li><strong>"100% deterministic"</strong> → Byte-deterministic, set-valued output — one digest across 20 runs per repo for nodes, edges, domains, and overlaps.</li><li><strong>"Sub-second every time"</strong> → Typical query ~95–120 ms; worst-case p95 264 ms on 3,201 symbols, where Node startup (~63 ms) dominates.</li><li><strong>"Beats commercial tools"</strong> → We compare only to stated, reproducible baselines (name-matching, lexical, random, the legacy fallback) — no head-to-head against tools we can't reproduce.</li></ul></div>
+    <div class="callout honesty"><ul><li><strong>"Finds all clones / 100% recall"</strong> → High-precision, body-confirmed overlap on the clones it surfaces (F1 1.0 synthetic, 0.98 on real axios) — it deliberately drops ambiguous edges because a false positive costs more than a miss.</li><li><strong>"Replaces human review"</strong> → It produces candidate lists and shows which merges are cycle-safe to apply — a structural pre-flight, not a semantic verdict.</li><li><strong>"Agents provably edit better"</strong> → It improves caller-discovery recall (+0.31, all reps positive) at equal token cost on the budgeted responses agents receive (v0.9.0). An earlier run on a different base model also showed ~34% fewer steps; that savings did not replicate, and we say so. The full edit-quality A/B (H18) was a null on clean tasks — a floor effect, reported honestly.</li><li><strong>"100% deterministic"</strong> → Byte-deterministic, set-valued output — one digest across 20 runs per repo for nodes, edges, domains, and overlaps.</li><li><strong>"Sub-second every time"</strong> → Typical query ~43–50 ms; worst-case p95 51.9 ms on 3,215 symbols, where Node startup (~29 ms) dominates.</li><li><strong>"Beats commercial tools"</strong> → We compare only to stated, reproducible baselines (name-matching, lexical, random, the legacy fallback) — no head-to-head against tools we can't reproduce.</li></ul></div>
     <div class="btn-row" style="margin-top:var(--s-6)">
       <a class="btn btn-primary" href="https://github.com/GhostlyGawd/codeweb/tree/main/bench" rel="noopener">Browse the benchmarks</a>
       <a class="btn" href="https://github.com/GhostlyGawd/codeweb/tree/main/bench/results" rel="noopener">Inspect the raw results</a>
     </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Reproduce the checks</h2>
+    <p>The qualitative Graphify comparison is dated and cites primary sources. It makes no measured performance claim.</p>
+    <ul>
+      <li><a href="https://github.com/GhostlyGawd/codeweb/blob/main/docs/graphify-comparison.md">Compare CodeWeb and Graphify</a></li>
+      <li><a href="https://github.com/GhostlyGawd/codeweb/blob/main/docs/guides/product-clarity-demo.md">Run the technical demo and recording script</a></li>
+      <li><a href="https://github.com/GhostlyGawd/codeweb/blob/main/docs/guides/product-clarity-pilot.md">Run the five-participant pilot</a></li>
+      <li><a href="https://github.com/GhostlyGawd/codeweb/blob/main/docs/guides/product-clarity-case-study.md">Record a maintainer decision</a></li>
+    </ul>
+    <p>These protocols support future research. They do not establish participant results, repeat use, or accepted maintainer findings.</p>
   </div>
 </section>
 
@@ -305,7 +325,7 @@
         <a class="brand" href="index.html">
           <span class="wm">code<span class="w">web</span></span>
         </a>
-        <p>A deterministic map of your codebase — one graph, read by humans and the agents editing alongside them.</p>
+        <p>Structural checks for AI code changes.</p>
       </div>
       <div class="footer-col">
         <h5>Product</h5>
@@ -317,6 +337,8 @@
       <div class="footer-col">
         <h5>Proof</h5>
         <a href="research.html">Research</a>
+        <a href="compare.html">Compare with grep</a>
+        <a href="lsp.html">Compare with LSP</a>
         <a href="https://github.com/GhostlyGawd/codeweb/tree/main/bench" rel="noopener">Benchmarks</a>
         <a href="https://github.com/GhostlyGawd/codeweb/tree/main/bench/results" rel="noopener">Raw results</a>
       </div>
@@ -326,10 +348,12 @@
         <a href="https://github.com/GhostlyGawd/codeweb/releases" rel="noopener">Releases</a>
         <a href="https://github.com/GhostlyGawd/codeweb/blob/main/LICENSE" rel="noopener">MIT License</a>
         <a href="support.html">Sponsor</a>
+        <a href="boundary.html">Free forever</a>
+        <a href="pricing.html">Teams pricing intent</a>
       </div>
     </div>
     <div class="footer-base">
-      <span>codeweb v0.12.0 · MIT · © 2026 <a href="https://github.com/GhostlyGawd">GhostlyGawd</a></span>
+      <span>codeweb v0.16.0 · MIT · © 2026 <a href="https://github.com/GhostlyGawd">GhostlyGawd</a></span>
       <span>Deterministic build · zero third-party requests on this page</span>
     </div>
   </div>

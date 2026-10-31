@@ -9,6 +9,146 @@ notes so validated results, papers, and new tools never get lost in commit histo
 
 ## [Unreleased]
 
+_Nothing yet. Open work lands here before it ships in the next tagged release._
+
+## [0.16.0] - 2026-10-02
+
+### Fixed
+- Preserve live outer calls after block-local shadows and keep JSX text out of declaration discovery. Multiline callback bodies retain their enclosing function/arrow extents. Cleanup/campaign proposals no longer include the reproduced live-function and phantom-text cases.
+- Resolve simple immutable callable aliases and literal Python decorator dependencies; qualify unsupported callable aliases and decorator factories. Respect parameter/callback bindings and ES namespace export surfaces, including cache invalidation on visibility changes.
+- Keep useful partial find/explain/context/risk results on CLI and MCP with shared in-band completeness. Incomplete decision gates remain inconclusive.
+- Map supported JSX component renders and known function values, including Python handler registration and JSX event properties. Impact follows reference consumers; direct-call answers expose reference users separately.
+- Keep incomplete or dynamic maps and JSX component-like orphans out of deletion proposals. Preserve unresolved-target and ambiguous-call diagnostics through extraction caches.
+
+### Added
+- Bundle a focused `codeweb` coding skill for mapped caller inspection, reuse comparison and structural edit verification in Codex. Document the plugin installation path and recognize an installed `codeweb-mcp` binary in local configuration checks.
+- Add opt-in local evidence receipts to context and review. Agents can compare previously mapped callers with a fresh source snapshot and read bounded historical pages. See `docs/cli.md`.
+
+## [0.15.0] - 2026-09-14
+
+### Added
+- Explicit pre-edit baselines survive ordinary and automatic graph refreshes. Agents can
+  refresh and verify an edit in one diff call, then check repairs against the same baseline.
+- Context responses distinguish list/source-evidence limits from graph uncertainty, with
+  actionable freshness and recovery information. Local setup diagnostics report installation,
+  graph discovery, source freshness and optional-parser availability without changing source.
+- First-use instructions include a tested installed-package cycle walkthrough and a
+  baseline-preserving MCP workflow.
+
+### Fixed
+- Diagnostic masking recognizes regex statements after multiline control heads while
+  preserving division expressions, avoiding false incomplete-analysis reports.
+- Package exclusions keep generated Python bytecode and verification-harness caches out
+  of the npm artifact, even after the verification suite has run.
+- Refreshing verification rejects baselines without valid node and edge arrays before
+  changing the live graph. Baseline parsing and fingerprinting use the same bytes.
+- Current documentation count checks include SPEC and recognize formatted counts and
+  Codeweb possessive phrasing while leaving dated audit and release records historical.
+- Known unsupported same-line JavaScript/TypeScript declaration layouts now carry bounded
+  source diagnostics. Gates refuse an unqualified clean verdict when either snapshot has
+  detected incomplete analysis. This contains the reported false-clean result; it does not
+  claim complete syntax coverage or repair every omitted declaration.
+- Gate comments use commit links only when the checkout is clean before and after analysis
+  and HEAD is unchanged; otherwise locations remain plain text. Comments include bounded
+  evidence and investigation guidance.
+- Removed unsupported metadata keys from the shipped hook configuration while retaining
+  all three handlers and moving their descriptions into adjacent documentation.
+
+### Changed
+- Prominent guidance describes mapped-graph limits, exported-symbol exemptions, skipped
+  checks, and tested-client scope. Teams availability copy now reflects restricted GitHub
+  App access while preserving the ratified planned price and free-local boundary.
+- Inconclusive analysis is a non-success result distinct from detected regressions; callers
+  must inspect diagnostics rather than interpreting an incomplete comparison as clean.
+
+### Documentation
+- Updated contributor guidance, operational graph-schema notes, and a documentation index
+  describe the required gate, ownership, provenance, freshness and missing data. Audit
+  indexes connect historical findings to implementation and verification records.
+
+### Verification scope
+- Runtime analysis remains deterministic, local and free of required third-party dependencies.
+  Optional parser installation is not a substitute for the incomplete-analysis checks.
+- Structural results do not establish behavioral correctness. Run the relevant product tests.
+  Release-candidate test results and artifact hashes are recorded in the accompanying review.
+
+### Also added in product clarity
+- Package commands for client setup, local diagnostics, change review, and the existing CI gate.
+- Portable change-review HTML with caller evidence, baseline provenance, and explicit analysis limits.
+- Report-only gate mode that preserves regression verdicts and still fails on analysis errors.
+- A reproducible edit-review demo, a dated Graphify comparison, and pilot and case-study protocols.
+
+### Changed
+- Public identity: “See what your AI edits affect.” and “Structural checks for AI code changes.”
+- Setup uses shared recipes for five clients and shows an observable caller-query check.
+- Findings separate body confidence from priority and provide source evidence and an agent task.
+- The public Axios demo is re-extracted from a pinned commit with current engine provenance.
+- Agent review details are bounded and report omitted counts; supporting HTML retains full evidence.
+
+## [0.14.0] - 2026-09-02
+
+### Added
+- **C and C++ join as first-class languages — 13 native languages ship.** Both follow the
+  existing per-language contract (`langOf` + rules, grammar dispatch, regex-tier fallback so the
+  AST tier stays optional, fixture-backed extractor suites). `tree-sitter-cpp.wasm` comes from
+  the already-pinned `@vscode/tree-sitter-wasm@0.3.1` (ABI 14); `tree-sitter-c.wasm` comes from
+  the tree-sitter org's own GitHub release v0.24.2 (ABI 15) — a second trusted grammar source
+  ratified by charter amendment A2, with `PROVENANCE.md` gaining a source column and a sha256
+  per wasm. The language count now propagates to every surface by NAME, gated by
+  `tests/lang-surfaces.test.mjs`, which encodes the live-versus-historical distinction so dated
+  records stay untouched.
+- **The free-forever boundary and the Teams price intent are published.** New site pages state
+  the ratified contract — anything that runs on one laptop against one repo is free forever;
+  money buys hosting, multi-repo aggregation, and human attention — alongside the hosted tier's
+  price intent (€10 per active author per month, active author = committed in the last 90 days,
+  flat and unlimited). Both pages ride every prose sweep via `PROSE_FILES`, and
+  `tests/boundary-pricing.test.mjs` pins the wording on both sides of the boundary.
+- **Two launch pages that argue on re-derivable numbers.** An LSP FAQ ("why not just an LSP")
+  and a comparison page, both first-class in the site's page table, the sitemap, and
+  `PROSE_FILES`, and both reachable by clicking from the homepage. Every number on them traces
+  to a committed receipt; the honesty ledger renders straight from `product.json`'s don't-claim
+  list, so a receipt re-run moves the page.
+- **Three upgrade moments, and the zones that stay ask-free.** The gate comment's footer carries
+  an org-dashboard line, the trend rail nudges at five or more snapshots in text mode only, and
+  the report footer keeps its attribution. The anti-placements are hard rules with tests: never
+  in an MCP tool response, never in a hook card, never on an error path, computed only from
+  local counters, one line, and suppressible via `CODEWEB_NO_PROMO=1`.
+
+### Changed
+- **The site and README lead with the deterministic regression gate.** The gate is the story;
+  the map and graph support it. The ratified identity line is unchanged and still enforced
+  verbatim on all four surfaces.
+- **The gate Action's examples pin a release tag, and gate adoption is observable.** Copy-paste
+  surfaces name the shipped version instead of `@main` (the release roll now keeps them
+  current), and the weekly acquisition ledger reports the real status of its adoption search
+  instead of silently recording a null when the search cannot connect.
+
+### Fixed
+- **Four benchmark instruments repaired, so every number re-derives.** `node bench/run-all.mjs`
+  exits 0 again. Every failure was in the instrument, not the product, and all four reproduce at
+  pre-release HEAD: the correctness-query oracle dropped `ref` edges the shipped cycle walk has
+  always followed (all five families now measure 0 disagreements over 497,864 comparisons);
+  edit-safety imported a module deleted in July and crashed at import, taking six hypotheses
+  down with it; the auxiliary harness flagged the footer's hyperlink as a network fetch and
+  carried a stale tool-count table; and the performance harness tripped over a `/tmp` symlink.
+  No published number moved as a consequence of the repairs.
+- **Release drift audit (`CLAUDE.md`, 150 · Drift Audit) — two claim-bearing corrections.**
+  `product.json`'s F10 "Sharded subgraphs" (mirrored to the product page) advertised a
+  capability whose implementation was deleted on 2026-07-19 by a measured decision recorded in
+  `bench/results/scale-typescript.json` → `previous.shardsDecision`: the monolithic graph loads
+  fast enough at 16k symbols, and the answer-preserving shard contract was never wired to a CLI
+  or MCP surface. The feature line is withdrawn rather than restored — the code is gone, and git
+  history holds it if a 100k-symbol case ever appears. This resolves charter row C9 the way C8
+  was resolved: claim-bearing copy does not ship a feature that does not exist. In the same
+  pass, the latency and scaling figures on the honesty ledger and the claim table were refreshed
+  from the regenerated `bench/results/performance.json` — they had been stale in the pessimistic
+  direction (worst-case p95 51.9 ms on 3,215 symbols, not 264 ms on 3,201).
+- **The MCP registry manifest's description said 27 tools while 28 ship.** `server.json`'s
+  description was the one tool-count surface no sweep read; it now self-heals through the
+  release roll like every other mirrored count.
+
+## [0.13.0] - 2026-08-17
+
 ### Added
 - **Evidence-backed README proof and acquisition visuals.** A compact benchmark strip links its
   three claims to the existing research ledger, three conversion badges lead to the npx trial,
@@ -29,7 +169,116 @@ notes so validated results, papers, and new tools never get lost in commit histo
   file (nothing imports it) never becomes a node, so lock files add no noise. Scan-cache
   format bumps to v18 (one cold re-extract per workspace on upgrade).
 
+### Added
+- **The after-edit gate loop is completable by any MCP client (AC-9).** `codeweb_refresh`
+  gains `snapshot:true` (also `refresh.mjs --snapshot`): the pre-refresh graph is preserved as
+  `graph.prev.json`, and `codeweb_diff`'s two arguments are now optional — `after` defaults to
+  the discovered graph and `before` defaults to that snapshot — so the prescribed
+  refresh-then-diff loop no longer needs the plugin's shell copy step. A missing snapshot gets
+  an actionable remedy naming the exact call.
+- **`codeweb_dependents` — the 28th tool (AC-10).** The complete "who do I break?" union
+  (call + import + inherit + test + ref edges, tagged by kind) was CLI-only; it is now a
+  first-class MCP tool derived from the same manifest entry, budgeted with true totals, and
+  `codeweb_callers` points at it for the full-union question.
+- **Staleness honesty reaches the advisors (AC-11).** Every spawned graph-consuming reply now
+  carries the call-time staleness verdict (previously only the orient family was annotated —
+  `codeweb_simulate` could pre-flight a refactor from a week-old map with full confidence), and
+  the overlap-independent advisors (deadcode, risk, hotspots, break_cycles, reading_order,
+  simulate, placement, fitness) joined the auto-refresh set. Overlap-consuming advisors stay
+  out by design: refresh drops overlaps, so they get the annotation, never a silent refresh.
+- **Agent-fallback maps carry their provenance (AC-12).** The codebase-anatomy skill's
+  `meta.engine` stamp (hybrid | tools | read) is now read downstream: the briefing payload and
+  the session-start injection caveat agent-extracted maps as unverified, instead of answering
+  with deterministic-tier authority.
+
+### Changed
+- **Claim values now trace to receipts, mechanically.** `check-consistency` gained
+  `auditClaimValues`: the published headline stats (the 74%/44% recall pair, the ~126×
+  impact-cost ratio, the "more than N comparisons" floor) are recomputed from their committed
+  receipt files and every surface restating a different value fails the build — closing the
+  drift class behind charter C6, where a re-run moved a receipt and every surface silently kept
+  the old number. Deliberately out of scope: the ±-form deltas (three legitimate values from
+  two receipts share one textual form). The requirements companion gained a one-way parity
+  check (a YAML-traced AC id must still exist in SPEC.md); the reverse — new ACs needing trace
+  records — is a re-baseline, which stays the operator's requirements process.
+- **A weekly-vitals workflow is drafted** (`weekly-vitals.yml`): the full gate, prove-red, and
+  the bench budget gate on a Monday schedule, so SPEC's kill-criteria tripwires can trip
+  between pushes (nothing executed for 18 days straight in August). Merging it is the
+  operator's adoption decision, recorded in the file header.
+- **The evals floor grew from one product case to four** (MCP initialize, tools/list carries
+  the new tool, query --help), release tooling gained CLI smoke tests (`version-sync` no-op on
+  an aligned repo; `screenshot` usage-not-stacktrace), `bench:all` now measures the tools/list
+  definitions surface (`toolsListBytes` — measured, not gated: the descriptions are P1's
+  experimental subject), `trend --json` emits one line (NDJSON-appendable), the impact answer
+  states its closure semantics (`call+inherit`; ref/import/test users via dependents), a dead
+  bench helper was removed, the graph schema's additive-only versioning stance is recorded in
+  the reference, and the extractor's cache-invariant map got its one page
+  (`docs/extractor-invariants.md`) — measurement over refactoring, per the hotspot ruling.
+- **The distribution trigger's second arm is finally measurable.** The weekly acquisition
+  ledger now records `gateReposExternal` (unique external repos referencing the gate Action in
+  a workflow file, via public GitHub code search — same no-telemetry ethics as every counter).
+  The parked Teams tier's own trigger (">10 external repos on the gate Action") could never be
+  observed firing before.
+- **The gate Action is stranger-ready.** `codeweb-ref` now really accepts a commit sha (clone
+  `--branch` fails on shas — branch/tag keep the shallow clone, shas fall back to
+  clone+checkout); a new `history` input persists a small cross-PR metrics ledger via the
+  Actions cache and renders the structural trend line in the sticky comment (previously the
+  trajectory feature was unreachable by adopters); the docs pin the action and `codeweb-ref`
+  to release tags instead of `@main` and show the monorepo matrix pattern. The self-gate
+  dogfoods `history`.
+- **The gate joined the product loop.** A first map of a repo with `.github/` now prints a
+  fourth `next:` line pointing at the CI gate, and every report/demo footer carries a
+  "gate your PRs" link — the team-lead doorway existed only in docs before.
+- **The Marketplace-publish step is gone (charter non-goal 6).** Publishing auto-triggered
+  whenever a `VSCE_PAT` secret existed — a secret must not be able to override a standing
+  instruction. The `.vsix` still builds and attaches to every release; the removal is recorded
+  in place and pinned by the workflow test.
+- **Grammar provenance is machine-verified.** `PROVENANCE.md` records a sha256 per vendored
+  wasm and `tests/grammar-provenance.test.mjs` recomputes them (both directions: no digest-less
+  wasm, no phantom rows) plus the runtime-pin pairing; the refresh recipe now names the
+  `ts-engine.mjs` version stamp, and release prep inventories `@vscode/tree-sitter-wasm@latest`
+  so the recorded Kotlin/Swift/C/C++ blockers resolve the moment upstream ships them.
+- **The LSP question is answered on the deciding surfaces** (product page + README): an LSP
+  answers one hop on demand in an editor session; codeweb builds one deterministic whole-graph
+  artifact agents query over MCP and CI diffs to gate a PR. Capability comparison only — no
+  invented numbers.
+- **Non-Claude MCP clients get the full loop, documented.** The start page now carries
+  per-client registration blocks (Cursor, Windsurf, Codex CLI, Gemini CLI, plugin-less Claude
+  Code) and a paste-ready rules snippet that teaches the before/after edit loop — the ambient
+  behavior the Claude plugin's hooks provide, for clients that surface neither hooks nor the
+  server's built-in instructions. The README names the loop's entry tools and links both.
+- **D4 closed — the last Spring-Cleaning debt item.** `codeweb_risk`'s ranking assembly moved
+  into `lib/risk.mjs` (`rankRisk` — one truth for the CLI and a future MCP fast path), and
+  `run.mjs`'s banner now reads optimize's `--json` totals instead of scraping its prose (a
+  wording tweak used to silently blank the ready/LOC fields; humans keep a rendered headline
+  and `CODEWEB_VERBOSE=1` shows the full advisory from `optimize.md`).
+- **D1 residue closed.** `reading-order`'s CLI budget default now derives from the tool
+  manifest via `budgetOf()` (the 40-vs-20 two-literal pair is gone — the manifest is the one
+  truth); `campaign`'s deliberate CLI/MCP budget divergence is documented at the site; and the
+  release gate now flags a `TOOL_BEHAVIOR` entry whose manifest spec was removed (dead
+  behavior — the reverse already threw at startup).
+- **The post-edit hook warns once, on one channel.** The structural warning rides the
+  structured `additionalContext` only; stderr is the fallback when that write fails — the same
+  warning used to arrive twice.
+- **External-review verdicts now record the reviewed commit** (`git rev-parse HEAD` of the
+  clone, first line of the verdict) — an adopt/avoid ruling without the commit it judged was a
+  claim without a source.
+
 ### Fixed
+- **C7 truth sweep (2026-08-16 drift audit).** The charter-ruled-fabricated sponsorship cost
+  premise still shipped through surfaces the claims gate never read: the report and demo footer
+  tooltips, `trend.mjs`'s five-snapshot rail, and the FUNDING.yml comment. All now carry the
+  ratified support framing, single-sourced from `product-copy.mjs` (`SPONSOR_LINE`), and the
+  gate closes the class — the cost-premise scan now sweeps every prose surface plus
+  FUNDING.yml, trend, and the gate comment; the generated artifacts (report template, live
+  demo) and the remaining site pages joined `PROSE_FILES`; and a numeric public claim hardcoded
+  in any script outside `product-copy.mjs` fails the build. Also corrected in the same sweep:
+  the README's 126× claim is attributed to the simulated grep loop its receipt actually
+  describes, the 74%/44% line carries its v0.9.0-pilot qualifier, the research page dates its
+  frozen receipts, the downloads page footer no longer claims "zero third-party requests" while
+  reading the public npm API, the README banner alt carries the ratified job line, and four
+  stale doc facts were fixed (two `cli.md` env rows, the `reference.md` extractor language
+  note, and the AST decision-record header).
 - The social-preview source is now a center-safe 1280×640 JPEG. Important copy remains visible
   in narrow mobile crops, and the generated site publishes matching JPEG Open Graph metadata.
 - The npm downloads dashboard now starts at the package's actual first publication date
@@ -1763,7 +2012,11 @@ The deterministic engine and its evidence base.
   ~490k oracle comparisons; the study found and fixed two real engine bugs the 286-test
   suite had missed (`paper/`).
 
-[Unreleased]: https://github.com/GhostlyGawd/codeweb/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/GhostlyGawd/codeweb/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/GhostlyGawd/codeweb/compare/v0.9.0...v0.10.0

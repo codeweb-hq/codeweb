@@ -8,7 +8,14 @@
 // here for the hooks (Spec E consolidation; the hooks previously trailed the extractor's list).
 // finding #11: `.mts/.cts` join — the NodeNext ext-remap table maps `./h.mjs` specifiers to
 // `.mts` sources, which only means something if those files are enumerated in the first place.
-export const SRC_RE = /\.(js|mjs|cjs|jsx|ts|tsx|mts|cts|py|rs|go|java|cs|rb|php|kt|kts|swift)$/;
+// `cpp|cc|cxx|hpp|hh|hxx` join for C++ and `c|h` for C (charter non-goal 8 / amendment A2). `.h`
+// is claimed by C: it is the header extension of BOTH languages, and extension is the only
+// evidence a static reader has — so it maps to the language whose extension it unambiguously is,
+// and a C++ project's headers still map (the two share one rule set).
+export const SRC_RE = /\.(js|mjs|cjs|jsx|ts|tsx|mts|cts|py|rs|go|java|cs|rb|php|kt|kts|swift|c|h|cpp|cc|cxx|hpp|hh|hxx)$/;
+
+// The extractor and advisory hooks share the same excluded directory scope.
+export const EXTRACTION_SKIP = /(^|[\\/])(node_modules|\.git|dist|build|out|vendor|third_party|\.codeweb|coverage)([\\/]|$)/;
 
 // finding 17: THE scan-cache filename — run.mjs, the post-edit hook, and refresh.mjs previously
 // used three different names for the same workspace (the first hook fire after every map ran a

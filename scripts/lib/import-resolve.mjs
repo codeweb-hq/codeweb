@@ -68,6 +68,29 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
     for (const c of importCandidates(r)) if (relSet.has(c)) return c;
     return null;
   }
+  // C++ `#include "…"`: the quoted form is the project-local one (the angle-bracket form is the
+  // system/search-path one and is never resolved here — a guess is worse than an absent edge).
+  // Unlike a JS specifier it is NOT dot-relative, and it resolves against the includer's directory
+  // FIRST and the target root second (the two cases `-I.` covers in every real build), so it needs
+  // its own resolver rather than a prefix bolted onto resolveImport.
+  function resolveInclude(fromAbs, spec) {
+    if (/^[\\/]/.test(spec) || /^[A-Za-z]:/.test(spec)) return null; // absolute include -> outside the repo universe
+    const here = rel(resolve(dirname(fromAbs), spec)).replace(/\\/g, '/');
+    if (relSet.has(here)) return here;
+    const fromRoot = spec.replace(/\\/g, '/').replace(/^\.\//, '');
+    if (relSet.has(fromRoot)) return fromRoot;
+    // The `include/` + `src/` split — C++'s dominant layout — resolves by NEITHER rule: the spec is
+    // relative to a `-I` search path that lives in a build file codeweb does not read. Fall back to
+    // a UNIQUE path-suffix match, the same evidence rule resolvePyModule uses for absolute imports:
+    // exactly one candidate is a fact about the repo, two or more is a guess and drops.
+    let best = null;
+    for (const rp of relSet) {
+      if (!rp.endsWith('/' + fromRoot)) continue;
+      if (best) return null; // ambiguous -> never guess
+      best = rp;
+    }
+    return best;
+  }
   // Resolve a Python module spec to a repo-relative file (`x.py` or a package's `x/__init__.py`).
   //   level > 0 -> RELATIVE: climb `level` package dirs from the importing file, then append the dotted
   //               path. Anchored to the file's real location, so it can't collide with stdlib.
@@ -126,6 +149,15 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
         const seg = part.trim().split(/\s+as\s+/);
         const orig = (seg[0] || '').trim(), exported = (seg[seg.length - 1] || '').trim();
         if (orig && orig !== 'default') map.set(exported, { target, orig });
+      }
+    }
+    // Local export clauses also change the namespace surface without changing any symbol id.
+    // Retain them in the re-export signature so a cached consumer cannot replay a removed alias.
+    const localCode = maskedOnce(relPath, 'js', text);
+    for (const local of localCode.matchAll(/\bexport\s*\{([^}]*)\}(?!\s*from\b)/g)) {
+      for (const part of local[1].split(',')) {
+        const pair = part.trim().split(/\s+as\s+/);
+        if (/^[A-Za-z_$][\w$]*$/.test(pair[0]) && /^[A-Za-z_$][\w$]*$/.test(pair.at(-1))) map.set(pair.at(-1), { target: relPath, orig: pair[0] });
       }
     }
     if (map.size) reExportByFile.set(relPath, map);
@@ -233,7 +265,41 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
     if (out != null || depth === 0) pyReExportMemo.set(memoKey, { out, files: childFiles });
     return out;
   };
-  const resolveFileMember = (fileRel, name) => {
+  const exportSurfaces = new Map();
+  const nodesByFile = new Map();
+  for (const n of nodes) { if (!nodesByFile.has(n.file)) nodesByFile.set(n.file, []); nodesByFile.get(n.file).push(n); }
+  const exportSurface = (fileRel) => {
+    if (exportSurfaces.has(fileRel)) return exportSurfaces.get(fileRel);
+    const surface = new Map();
+    const abs = absByRel.get(fileRel), record = abs && fileSyms.get(abs);
+    const code = record ? maskedOnce(fileRel, 'js', textOf(abs, record)) : '';
+    const lines = code.split(/\r?\n/);
+    for (const n of nodesByFile.get(fileRel) || []) if (n.exports && n.kind !== 'module') {
+      if (!/\bexport\s+default\b/.test(lines[n.line - 1] || '')) surface.set(n.label, n.id);
+      else surface.set('default', n.id);
+    }
+    for (const m of code.matchAll(/\bexport\s*\{([^}]*)\}(?!\s*from\b)/g)) {
+      for (const part of m[1].split(',')) {
+        const pair = part.trim().split(/\s+as\s+/), id = fileRel + ':' + pair[0];
+        if (nodeIdSet.has(id)) surface.set(pair.at(-1), id);
+      }
+    }
+    exportSurfaces.set(fileRel, surface);
+    return surface;
+  };
+  const resolveExportMember = (fileRel, name, seen = new Set()) => {
+    const key = fileRel + ':' + name;
+    if (seen.has(key)) return null;
+    const next = new Set(seen); next.add(key);
+    const direct = exportSurface(fileRel).get(name); if (direct) return direct;
+    const hop = reExportByFile.get(fileRel)?.get(name);
+    if (hop) return resolveExportMember(hop.target, hop.orig, next);
+    if (name === 'default') return null; // export-star does not forward default
+    const hits = new Set((starReExportByFile.get(fileRel) || []).map(f => resolveExportMember(f, name, next)).filter(Boolean));
+    return hits.size === 1 ? [...hits][0] : null;
+  };
+  const resolveFileMember = (fileRel, name, { exportsOnly = false } = {}) => {
+    if (exportsOnly) return resolveExportMember(fileRel, name);
     const exact = fileRel + ':' + name;
     if (nodeIdSet.has(exact)) return exact;
     const m = memberByFile.get(exact);
@@ -241,6 +307,7 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
     // Spec Q2 (member path): `flask.render_template(...)` through `import flask` — the member is a
     // re-export in the package __init__; follow it exactly like the from-import path does.
     if (fileRel.endsWith('.py')) { const viaReExport = pyReExportResolve(fileRel, name); if (viaReExport) return viaReExport; }
+    else if (/\.(jsx?|mjs|cjs|tsx?|mts|cts)$/.test(fileRel)) { const viaReExport = resolveReExport(fileRel, name); if (viaReExport) return viaReExport; }
     return null;
   };
 
@@ -253,6 +320,9 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
   // Python (line-oriented, `m` flag): `from [.]*MODULE import NAMES` and `import MODULE [as A][, ...]`.
   const pyFrom = /^[ \t]*from\s+(\.*)([\w.]*)\s+import\s+(.+)$/gm;
   const pyImport = /^[ \t]*import\s+([\w][\w.]*(?:\s+as\s+\w+)?(?:\s*,\s*[\w][\w.]*(?:\s+as\s+\w+)?)*)/gm;
+  // C++ `#include "path"` — quoted form only (see resolveInclude). Line-anchored so an `#include`
+  // written inside a macro body or a raw string can't bind.
+  const cppInclude = /^[ \t]*#[ \t]*include[ \t]*"([^"]+)"/gm;
 
   /**
    * Bind one file's imports: precise local-name aliases (amap), namespace/default module
@@ -265,8 +335,8 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
    * included) — and `bindCand`, the ORIGINAL imported names. Together they are the name-delta
    * replay rule's per-file inputs.
    */
-  function bindFileImports({ fAbs, r, isPy, text, aId, defaultExportByFile, kindById }) {
-    const amap = new Map(), nsmap = new Map(), classmap = new Map(), edges = [];
+  function bindFileImports({ fAbs, r, isPy, isCpp, text, aId, defaultExportByFile, kindById }) {
+    const amap = new Map(), nsmap = new Map(), classmap = new Map(), external = new Set(), namespace = new Set(), edges = [];
     const deps = new Set(), bindCand = new Set();
     // Record-and-return: every resolved target joins `deps` (finding #17's bindDeps). The name is
     // free to be anything — the extractor's fallback no longer targets closure-locals (the `dep`
@@ -275,7 +345,13 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
     const addDep = (t) => { if (t) deps.add(t); return t; };
     let m;
     const addNamed = (namesStr, spec) => {
-      const target = addDep(resolveImport(fAbs, spec)); if (!target) return;
+      const target = addDep(resolveImport(fAbs, spec));
+      if (!target) {
+        if (!spec.startsWith('.') && !spec.startsWith('/') && !/^[@~]\//.test(spec)) for (const part of namesStr.split(',')) {
+          const segments = part.trim().split(/\s+as\s+/); if (segments.at(-1)) external.add(segments.at(-1).trim());
+        }
+        return;
+      }
       // A named import FROM a .json target (`import { version } from './package.json'`, TS
       // resolveJsonModule) has no symbol nodes to bind to — a JSON file is file-level in the map.
       // Emit the coarse module edge so the file dependency survives instead of vanishing.
@@ -335,7 +411,8 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
     // node (created on demand below), NOT on its anchor symbol — member-access now produces the precise
     // per-symbol edges, so attributing the coarse edge to one symbol only pollutes its dependents.
     const addModuleBinding = (local, spec, isDefault) => {
-      const t = addDep(resolveImport(fAbs, spec)); if (!t) return;
+      const t = addDep(resolveImport(fAbs, spec));
+      if (!t) { if (local && !spec.startsWith('.') && !spec.startsWith('/') && !/^[@~]\//.test(spec)) external.add(local); return; }
       if (local) nsmap.set(local, t);
       // A default import binds the target's default export: attribute to its single owning symbol when
       // there is one (class/fn AxiosError), else the module object (object-default barrel -> <module>).
@@ -350,7 +427,18 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
       if (aId && aId !== edgeTarget) edges.push([aId, edgeTarget]);
     };
     const addSide = (spec) => { const t = addDep(resolveImport(fAbs, spec)); if (!t) return; if (aId) edges.push([aId, t + ':<module>']); };
-    if (isPy) {
+    if (isCpp) {
+      // A header contributes NAMES, not a module object: C++ has no import alias to bind, so the
+      // edge is the file-level "includes this header" dependency — the same coarse `<module>`
+      // edge a JS side-effect import gets. Bare-name resolution (edge-derive) then wires the calls
+      // those names stand for, which is exactly how the header/implementation split maps.
+      const cppText = maskedOnce(r, 'cppinc', text); // comments blanked, string VALUES kept: the path is inside the quotes
+      cppInclude.lastIndex = 0;
+      while ((m = cppInclude.exec(cppText))) {
+        const t = addDep(resolveInclude(fAbs, m[1]));
+        if (t && aId) edges.push([aId, t + ':<module>']);
+      }
+    } else if (isPy) {
       const pyText = maskedOnce(r, 'py', text); // don't bind imports that live in a docstring/comment
       while ((m = pyFrom.exec(pyText))) addPyFrom(m[1].length, m[2], m[3]);
       while ((m = pyImport.exec(pyText))) addPyImports(m[1]);
@@ -358,15 +446,15 @@ export function createImportResolver({ rel, relSet, absByRel, fileSyms, textOf, 
       while ((m = reqNamed.exec(text))) addNamed(m[1], m[2]);
       while ((m = esNamed.exec(text))) addNamed(m[1], m[2]);
       while ((m = reqDefault.exec(text))) addModuleBinding(m[1], m[2], true);
-      while ((m = esStar.exec(text))) addModuleBinding(m[1], m[2], false);
+      while ((m = esStar.exec(text))) { addModuleBinding(m[1], m[2], false); namespace.add(m[1]); }
       while ((m = esDefault.exec(text))) addModuleBinding(m[1], m[2], true);
       while ((m = esSide.exec(text))) addSide(m[1]);
     }
-    return { amap, nsmap, classmap, edges, deps, bindCand };
+    return { amap, nsmap, classmap, external, namespace, edges, deps, bindCand };
   }
 
   return {
-    resolveImport, resolvePyModule,
+    resolveImport, resolvePyModule, resolveInclude,
     reExportByFile, starReExportByFile, scanJsReExports, loadJsReExports, resolveReExport,
     pyReExportResolve, pyReExportTableOf, resolveFileMember, bindFileImports,
   };

@@ -1,6 +1,6 @@
 # SEO & Discoverability Audit — codeweb
 
-**Date:** 2026-07-23 · **Scope:** the public web surface (site/ → docs/ → https://ghostlygawd.github.io/codeweb/ incl. /demo/) **plus** the channels developers actually search for a tool like this: GitHub search/topics, npm search, the MCP registry, and the Claude Code plugin marketplace. All page checks were made against the **live deployed site** (fetched 2026-07-23) and byte-compared to the committed `docs/` build; channel checks hit the live GitHub API, npm registry API, and registry.modelcontextprotocol.io. Read-only pass; this file is the only write. Prior context: FUNNEL.md (install leak), COMPETITIVE.md (~155 npm downloads/week — the crisis all rankings below are weighted against).
+**Date:** 2026-07-23 · **Scope:** the public web surface (site/ → docs/ → https://codeweb-hq.github.io/codeweb/ incl. /demo/) **plus** the channels developers actually search for a tool like this: GitHub search/topics, npm search, the MCP registry, and the Claude Code plugin marketplace. All page checks were made against the **live deployed site** (fetched 2026-07-23) and byte-compared to the committed `docs/` build; channel checks hit the live GitHub API, npm registry API, and registry.modelcontextprotocol.io. Read-only pass; this file is the only write. Prior context: FUNNEL.md (install leak), COMPETITIVE.md (~155 npm downloads/week — the crisis all rankings below are weighted against).
 
 ---
 
@@ -32,7 +32,7 @@ Ranked by traffic at stake (channel findings first — that's where this product
 - **Lens:** Crawlability / channel presence
 - **Where:** GitHub repo settings (verified live: `"topics": []`, `"homepage": null`, description "Dissect a codebase into atomic symbols… Claude Code plugin." — no "MCP", no "call graph" as searchable phrase)
 - **Impact:** codeweb is un-findable exactly where its buyers search. Measured today: absent from top-10 for its **own name** (830 competing "codeweb" repos; CodeWebChat 1,384★ owns the query) and absent from "mcp call graph codebase" (42 repos) where **every** top-10 rival carries `mcp`/`mcp-server`/`claude-code`/`call-graph` topics. Topic pages (github.com/topics/mcp-server etc.) are browsed directories codeweb simply isn't shelved in. Highest-traffic gap in this report.
-- **Fix sketch:** In repo settings (zero code): add ~15 topics — `mcp`, `mcp-server`, `model-context-protocol`, `claude-code`, `claude-code-plugin`, `call-graph`, `dependency-graph`, `code-analysis`, `static-analysis`, `code-visualization`, `codebase-map`, `dead-code`, `refactoring`, `developer-tools`, `ai-agents`; set homepage = `https://ghostlygawd.github.io/codeweb/`; rewrite description to lead with the searched nouns: "Deterministic call/import graph of your codebase — 27 MCP tools for coding agents + a self-contained interactive map. Claude Code plugin & MCP server."
+- **Fix sketch:** In repo settings (zero code): add ~15 topics — `mcp`, `mcp-server`, `model-context-protocol`, `claude-code`, `claude-code-plugin`, `call-graph`, `dependency-graph`, `code-analysis`, `static-analysis`, `code-visualization`, `codebase-map`, `dead-code`, `refactoring`, `developer-tools`, `ai-agents`; set homepage = `https://codeweb-hq.github.io/codeweb/`; rewrite description to lead with the searched nouns: "Deterministic call/import graph of your codebase — 27 MCP tools for coding agents + a self-contained interactive map. Claude Code plugin & MCP server."
 - **Effort:** S (minutes)
 
 **F2 · Not in the official MCP registry (0 results) — no `server.json`**
@@ -65,7 +65,7 @@ Ranked by traffic at stake (channel findings first — that's where this product
 
 **F6 · No sitemap.xml, no robots.txt, and every inbound link is nofollow — the site has no crawl path in**
 - **Lens:** Crawlability
-- **Where:** `https://ghostlygawd.github.io/codeweb/sitemap.xml` → 404; `/robots.txt` → 404 (both fetched); all three sampled github.com links to the Pages site carry `rel="nofollow"` (fetched repo HTML); no external inbound links exist (0 stars/forks, no directory listings — F1–F3); site age 32 days (repo created 2026-06-21)
+- **Where:** `https://codeweb-hq.github.io/codeweb/sitemap.xml` → 404; `/robots.txt` → 404 (both fetched); all three sampled github.com links to the Pages site carry `rel="nofollow"` (fetched repo HTML); no external inbound links exist (0 stars/forks, no directory listings — F1–F3); site age 32 days (repo created 2026-06-21)
 - **Impact:** Nothing forbids indexing (no noindex, no x-robots-tag header — verified), but nothing invites it either: discovery relies on Google happening upon a nofollow-only github.io subpath. Indexation could not be confirmed externally (SERP endpoints block automation — DDG returned a 202 challenge); structurally, assume near-zero crawl equity today. A sitemap is also the prerequisite for Search Console submission — the one lever that forces indexation without waiting for links.
 - **Fix sketch:** Emit `robots.txt` (allow all + `Sitemap:` line) and `sitemap.xml` (6 URLs: `/`, product, research, start, changelog, `demo/`) from the `PAGES` table already in site/build.mjs:227–233 — ~15 lines, stays deterministic; then verify the property in Google Search Console + Bing Webmaster and submit.
 - **Effort:** S
@@ -164,4 +164,4 @@ AI-answer-engine proxy: rivals win through third-party content AI engines cite; 
 2. *Priority query → answer-ready page:* brand queries → homepage; "what breaks if I change this" / impact analysis → homepage FAQ + product page; category ("MCP server call graph") → homepage title + FAQ; install intent → start page.
 3. *Remaining high-impact gaps are not repo-fixable:* (a) this branch must merge to main for the fixes to deploy; (b) Google Search Console verification is operator-only (OPERATOR-ACTIONS.md §3); (c) rivals win the category through third-party citations and directory presence — earned coverage, not code; (d) crawl/index latency on a 0-star, 40-day-old subpath.
 
-**Re-audit trigger:** after this branch merges + Pages deploys + ~1–2 weeks of crawl time, rerun B1–B3 and verify `https://ghostlygawd.github.io/codeweb/llms.txt` serves 200.
+**Re-audit trigger:** after this branch merges + Pages deploys + ~1–2 weeks of crawl time, rerun B1–B3 and verify `https://codeweb-hq.github.io/codeweb/llms.txt` serves 200.

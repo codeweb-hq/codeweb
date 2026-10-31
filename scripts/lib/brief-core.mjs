@@ -1,3 +1,4 @@
+import { incompleteAnalysis, INCOMPLETE_STEP } from './analysis-completeness.mjs';
 // brief-core — the day-one briefing: everything an agent burns its first 20-50k tokens
 // discovering, pre-computed from the graph into one ~2KB page. Where things live, what the
 // repo hangs off, where the tests are, what's already known to be wrong. Injected at session
@@ -6,6 +7,12 @@
 import { fileCycles, orphans, fanInOf } from './graph-ops.mjs';
 
 const CONFIRMED = new Set(['high', 'medium']);
+
+// AC-12: the agent-fallback path (skills/codebase-anatomy) stamps meta.engine as
+// hybrid | tools | read; the deterministic pipeline stamps ctags | regex. The values existed
+// but nothing downstream read them — an agent-built map answered with deterministic-tier
+// authority. The briefing (the day-one surface) now says the provenance out loud.
+const AGENT_ENGINES = new Set(['hybrid', 'tools', 'read']);
 
 /** Assemble the briefing object from a normalized graph + index. Pure; budgeting built in. */
 export function buildBrief(graph, index) {
@@ -47,6 +54,7 @@ export function buildBrief(graph, index) {
   const orph = orphans(graph, index).length;
 
   return {
+    ...(incompleteAnalysis(graph) ? { analysis: incompleteAnalysis(graph) } : {}),
     target: graph.meta?.target || null,
     root: graph.meta?.root || null,
     generatedAt: graph.meta?.generatedAt || null,
@@ -57,6 +65,8 @@ export function buildBrief(graph, index) {
     loadBearing,
     entryPoints,
     tests: { symbols: testNodes.length, dirs: topTestDirs },
+    // AC-12: agent-extracted maps carry their provenance into every briefing.
+    ...(AGENT_ENGINES.has(graph.meta?.engine) ? { engine: { source: 'agent', mode: graph.meta.engine, note: 'agent-extracted map (unverified by the deterministic pipeline) — treat edges as approximate' } } : {}),
     // RETENTION R2: a refresh drops overlaps and STAMPS the drop — a 0 that means "pending
     // recount" must never render as "nothing to fix" (the human's reason to return).
     findings: { duplications: dup, cycles: cyc, orphanCandidates: orph, ...(graph.meta?.overlapsDroppedAt && dup === 0 ? { notRecounted: true } : {}) },
@@ -66,6 +76,7 @@ export function buildBrief(graph, index) {
 /** One-page text rendering (the session-start injection format). */
 export function renderBrief(b) {
   const L = [];
+  if (b.analysis?.status === 'incomplete') L.push(INCOMPLETE_STEP);
   // ACTIVATION A7: an --allow-empty map has zero symbols. Say THAT — the normal render
   // ("0 symbols … ask codeweb before guessing") would point agents at a map that knows nothing.
   if (!b.size || b.size.symbols === 0) {
@@ -74,6 +85,7 @@ export function renderBrief(b) {
     return L.join('\n');
   }
   L.push(`codeweb brief — ${b.target || b.root || 'mapped repo'}: ${b.size.symbols} symbols / ${b.size.files} files / ${b.size.domains} domains (${(b.languages || []).join(', ') || 'unknown languages'})`);
+  if (b.engine && b.engine.source === 'agent') L.push(`provenance: ${b.engine.note}.`); // AC-12
   if (b.domains.length) {
     L.push('domains:');
     for (const d of b.domains) {

@@ -25,9 +25,9 @@ import { die, emitJson, finish, capList, checkStaleness, loadGraph, parseArgs } 
 import { bump } from './lib/stats.mjs'; // #10: CLI queries count toward the receipt too
 
 // D1: the mode flags derive from the manifest the MCP server also reads — a new query tool
-// declared there grows a CLI flag here with no edit. --dependents is CLI-only (no MCP tool yet),
-// so it joins the symbol-mode list explicitly.
-const SYMBOL_MODES = QUERY_TOOL_SPECS.filter((s) => s.need.includes('symbol')).map((s) => s.kind).concat('dependents');
+// declared there grows a CLI flag here with no edit (AC-10 closed the dependents gap: the union
+// answer is now a first-class tool on both transports, derived from the one manifest entry).
+const SYMBOL_MODES = QUERY_TOOL_SPECS.filter((s) => s.need.includes('symbol')).map((s) => s.kind);
 const BARE_MODES = QUERY_TOOL_SPECS.filter((s) => !s.need.includes('symbol')).map((s) => s.kind);
 
 // finding 24: THE flag loop (lib/cli.mjs parseArgs); the query-mode flags stay a thin post-pass —
@@ -68,19 +68,24 @@ if (opts.json) { emitJson(payload, code); } else {
 if (payload.found === false) {
   // #2: surface the payload's near-matches + next step on the text transport too.
   const near = payload.suggestions?.length ? ` — near matches: ${payload.suggestions.join(', ')}` : '';
-  die(`symbol not found: ${opts.symbol}${near} (concept search: find.mjs "<free text>")`, 1);
+  die(`symbol not found: ${opts.symbol}${near} (concept search: find.mjs "<free text>")`, code);
 }
 const p = payload;
+if (p.analysis?.status === 'incomplete') console.log(`  analysis: ${p.analysis.nextSteps.join(' ')}`);
 if (p.query === 'callers' || p.query === 'callees' || p.query === 'tests') {
   const extra = p.matched.length > 1 ? ` (${p.matched.length} matches: ${p.matched.join(', ')})` : '';
   console.log(`${p.query} of ${p.symbol}${extra}: ${p.count}`);
+  if (p.referenceCount) console.log(`  ${p.referenceCount} mapped reference user(s) — use codeweb_dependents`);
+  if (p.caveat) console.log(`  ${p.caveat}`);
   for (const r of p.results) console.log(`  ${r}`);
 } else if (p.query === 'dependents') {
   const extra = p.matched.length > 1 ? ` (${p.matched.length} matches)` : '';
   console.log(`dependents of ${p.symbol}${extra}: ${p.count} (call ${p.byKind.call.length}, import ${p.byKind.import.length}, inherit ${p.byKind.inherit.length}, test ${p.byKind.test.length}, ref ${p.byKind.ref.length})`);
+  if (p.caveat) console.log(`  ${p.caveat}`);
   for (const r of p.results) console.log(`  ${r}`);
 } else if (p.query === 'impact') {
-  console.log(`impact of ${p.symbol}: ${p.count} functions across ${p.domains.length} domains`);
+  console.log(`impact of ${p.symbol}: ${p.count} mapped consumers across ${p.domains.length} domains`);
+  console.log(`  scope: ${p.closure}`);
   if (p.domains.length) console.log(`  domains: ${p.domains.join(', ')}`);
   for (const r of p.results) console.log(`  ${r}`);
 } else if (p.query === 'cycles') {

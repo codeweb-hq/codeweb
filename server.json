@@ -1,20 +1,20 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
-  "name": "io.github.GhostlyGawd/codeweb",
-  "description": "Your agents break less code and burn fewer tokens — a deterministic call graph over 27 MCP tools.",
+  "name": "io.github.codeweb-hq/codeweb",
+  "description": "See what your AI edits affect. Structural checks for AI code changes. 28 MCP tools, no LLM.",
   "status": "active",
   "repository": {
-    "url": "https://github.com/GhostlyGawd/codeweb",
+    "url": "https://github.com/codeweb-hq/codeweb",
     "source": "github"
   },
-  "version": "0.12.0",
-  "websiteUrl": "https://ghostlygawd.github.io/codeweb/",
+  "version": "0.16.0",
+  "websiteUrl": "https://codeweb-hq.github.io/codeweb/",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@ghostlygawd/codeweb",
-      "version": "0.12.0",
+      "version": "0.16.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

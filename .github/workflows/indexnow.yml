@@ -21,9 +21,9 @@ jobs:
         run: |
           KEY="$(tr -d '[:space:]' < site/indexnow-key.txt)"
           URLS="$(grep -o '<loc>[^<]*</loc>' docs/sitemap.xml | sed 's/<[^>]*>//g' | jq -R . | jq -s .)"
-          BODY="$(jq -n --arg host "ghostlygawd.github.io" \
+          BODY="$(jq -n --arg host "codeweb-hq.github.io" \
                         --arg key "$KEY" \
-                        --arg keyLocation "https://ghostlygawd.github.io/codeweb/${KEY}.txt" \
+                        --arg keyLocation "https://codeweb-hq.github.io/codeweb/${KEY}.txt" \
                         --argjson urlList "$URLS" \
                         '{host:$host,key:$key,keyLocation:$keyLocation,urlList:$urlList}')"
           echo "$BODY"

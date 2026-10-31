@@ -1,14 +1,14 @@
 {
   "name": "codeweb",
-  "tagline": "Your agents break less code and burn fewer tokens.",
+  "tagline": "See what your AI edits affect.",
   "repo": "https://github.com/GhostlyGawd/codeweb",
-  "pagesBase": "https://ghostlygawd.github.io/codeweb/",
-  "elevator": "Your agents break less code and burn fewer tokens. codeweb reads your code and maps it: every function, and every call between them (~3s for 3,000 symbols). Static analysis, no LLM — the same code always produces the same map. Your coding agents query the map over 27 deterministic MCP tools instead of grepping; grep misses more than half of a function's real callers, and agents break the code they can't see. In measured tests, agents found 74% of a function's real callers with the map and 44% with grep, at the same cost. The supporting view for you: a self-contained interactive map showing what one file can't — duplicated logic, dead code, hotspots, and tangled domains.",
+  "pagesBase": "https://codeweb-hq.github.io/codeweb/",
+  "elevator": "See what your AI edits affect. Structural checks for AI code changes. Trace callers before an edit. Check changes for new dependency cycles, body-confirmed duplication, and lost callers. Local static analysis supplies 28 MCP tools and a supporting report. No LLM in the checks. A passing result does not prove the program works.",
   "philosophy": [
     "Deterministic — no LLM in the analysis loop; the same repo always yields the same graph.",
-    "Zero runtime dependencies — the whole pipeline runs on an empty node_modules.",
+    "Zero required dependencies — the whole pipeline runs on an empty node_modules.",
     "Read-only by default — codeweb never executes the code it maps.",
-    "Evidence over guesswork — every finding is body-confirmed and pre-flighted against a regression gate."
+    "Evidence with limits — inspect findings and unresolved relationships before acting."
   ],
   "languages": [
     "JavaScript",
@@ -21,7 +21,9 @@
     "Ruby",
     "PHP",
     "Kotlin",
-    "Swift"
+    "Swift",
+    "C",
+    "C++"
   ],
   "modes": [
     {
@@ -32,14 +34,14 @@
     {
       "key": "external",
       "title": "Review before you adopt",
-      "desc": "Clone a third-party repo read-only, fully map it, and get an adoption review before you commit to depending on it. codeweb never runs the target."
+      "desc": "Clone a third-party repo read-only, map its supported source, and get an adoption review before you commit to depending on it. codeweb never runs the target."
     }
   ],
   "proof": {
     "headline": [
       {
         "num": "126×",
-        "label": "cheaper 'what breaks if I change this' answers — one call vs grepping in rounds",
+        "label": "smaller measured context size than a simulated graph-assisted grep loop; not total session savings",
         "src": "oracle-ab.json"
       },
       {
@@ -82,12 +84,16 @@
           "desc": "Direct callers of a symbol (call-edge in-neighbors)."
         },
         {
+          "name": "codeweb_dependents",
+          "desc": "mapped users of a symbol — call, import, inherit, test, and ref edges in one answer (\"who do I break?\")"
+        },
+        {
           "name": "codeweb_callees",
           "desc": "The functions a symbol calls."
         },
         {
           "name": "codeweb_impact",
-          "desc": "Blast radius: every function transitively affected by a change, plus domains touched. Call before editing."
+          "desc": "Blast radius: mapped transitive callers and inheritance dependents, plus domains touched. Call before editing."
         },
         {
           "name": "codeweb_cycles",
@@ -279,11 +285,6 @@
           "id": "F9",
           "name": "Incremental edges",
           "desc": "Per-file edge cache — byte-identical to a full extract, re-derived only for changed files."
-        },
-        {
-          "id": "F10",
-          "name": "Sharded subgraphs",
-          "desc": "Answer queries from one shard + a boundary index, same result as the monolith."
         }
       ]
     }
@@ -297,7 +298,7 @@
       "source": "oracle-ab.json"
     },
     {
-      "claim": "Blast-radius context cost vs recursive grep",
+      "claim": "Blast-radius context-size comparison with simulated recursive grep",
       "tag": "validated",
       "metric": "~1KB/call vs ~130KB (126x), grep loop simulated generously (graph-assisted frontier)",
       "sample": "30 vite symbols, mean impact 18 symbols",
@@ -362,12 +363,12 @@
     {
       "claim": "Sub-quadratic scaling",
       "tag": "validated",
-      "metric": "exponent b=0.33, CI [0.13, 0.53]",
-      "sample": "100–3,201 symbols",
+      "metric": "exponent b=0.34, CI [0.11, 0.57]",
+      "sample": "100–3,215 symbols",
       "source": "performance.json"
     },
     {
-      "claim": "Zero runtime dependencies",
+      "claim": "Zero required dependencies",
       "tag": "validated",
       "metric": "full pipeline runs on empty node_modules",
       "sample": "non-vacuity control passes",
@@ -376,14 +377,14 @@
     {
       "claim": "Multi-language extraction parity",
       "tag": "validated",
-      "metric": "11 native languages (JS/TS/Py/Rust/Go receipts; Java/C#/Ruby/PHP/Kotlin/Swift pinned by per-language suites)",
-      "sample": "per-language fixtures (JS/TS/Py/Rust/Go receipts; the rest pinned by tests/lang-*.test.mjs)",
+      "metric": "13 native languages (JS/TS/Py/Rust/Go receipts; Java/C#/Ruby/PHP/Kotlin/Swift/C/C++ pinned by per-language suites)",
+      "sample": "per-language fixtures (JS/TS/Py/Rust/Go receipts; the rest pinned by tests/lang-*.test.mjs and tests/extract-c*.test.mjs)",
       "source": "auxiliary.json"
     },
     {
       "claim": "MCP tool / CLI parity",
       "tag": "validated",
-      "metric": "27 / 27 tools",
+      "metric": "28 / 28 tools",
       "sample": "JSON-RPC conformance (suite: tests/mcp.test.mjs)",
       "source": "auxiliary.json"
     },
@@ -449,11 +450,12 @@
     },
     {
       "instead_of": "\"Sub-second every time\"",
-      "we_say": "Typical query ~95–120 ms; worst-case p95 264 ms on 3,201 symbols, where Node startup (~63 ms) dominates."
+      "we_say": "Typical query ~43–50 ms; worst-case p95 51.9 ms on 3,215 symbols, where Node startup (~29 ms) dominates."
     },
     {
       "instead_of": "\"Beats commercial tools\"",
       "we_say": "We compare only to stated, reproducible baselines (name-matching, lexical, random, the legacy fallback) — no head-to-head against tools we can't reproduce."
     }
-  ]
+  ],
+  "descriptor": "Structural checks for AI code changes."
 }

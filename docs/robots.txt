@@ -3,4 +3,4 @@ Allow: /
 Disallow: /*.md$
 Disallow: /decisions/
 Disallow: /specs/
-Sitemap: https://ghostlygawd.github.io/codeweb/sitemap.xml
+Sitemap: https://codeweb-hq.github.io/codeweb/sitemap.xml

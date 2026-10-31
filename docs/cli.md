@@ -7,8 +7,8 @@ wins and this file has a bug — please report it.
 
 | bin | what it runs | typical call |
 |---|---|---|
-| `codeweb` | the full pipeline (`scripts/run.mjs`) | `codeweb .` — map the current repo into `./.codeweb/` |
-| `codeweb-mcp` | the MCP stdio server (27 read-only tools) | `claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp` |
+| `codeweb` | map, setup, diagnostics, review, or PR gate | `codeweb .` — map the current repo into `./.codeweb/` |
+| `codeweb-mcp` | the MCP stdio server (28 read-only tools) | `claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp` |
 | `codeweb-query` | graph queries (`scripts/query.mjs`) | `codeweb-query --impact <symbol>` from a mapped repo |
 | `codeweb-diff` | the regression gate (`scripts/diff.mjs`) | `codeweb-diff before.json after.json` — exit 1 on a regression |
 
@@ -33,13 +33,45 @@ for "regression found").
 Streams: results (the `done ->` block, or the `--json` line) are **stdout**; stage progress and
 children's output are **stderr** — `codeweb . | grep mapped` and `codeweb . 2>/dev/null` both work.
 
+## Package subcommands
+
+Run these commands through an installed `codeweb` bin or replace `codeweb` with `npx -y @ghostlygawd/codeweb`.
+Each subcommand supports `--help`.
+
+| Command | Required input | Result |
+|---|---|---|
+| `codeweb setup --client cursor` | `claude`, `cursor`, `windsurf`, `gemini`, or `codex` | Prints one client recipe without changing configuration; `--json` returns the recipe and steps |
+| `codeweb doctor --json` | A local map; optional `--graph <file>` | Checks runtime, local MCP initialization, graph presence, and recorded freshness |
+| `codeweb doctor --client cursor --config .cursor/mcp.json` | Both flags for an explicit configuration check | Inspects only that file; does not execute its command or print its values |
+| `codeweb review .codeweb/graph.json --changed a.js --json --html review.html` | A graph and `--changed <file[:start-end],...>` or `--range <gitref>` | Reports changed symbols, affected callers, findings, coverage, and analysis limits |
+| `codeweb gate --base origin/main --target src` | A base git ref; full local history | Compares the base with the working tree and reports structural regressions |
+
+`review` accepts `--before <graph.json>` for a baseline and `--gate` to block on findings. Analysis states are `complete`, `incomplete`, or `stale` for the checks named in the report.
+A clean structural verdict does not prove runtime correctness. Unknown coverage stays unknown.
+
+`doctor --json` returns `ok`, named `pass`, `fail`, or `unknown` checks, and an unverified editor connection. Required failures or unknown freshness return exit 2.
+Successful local diagnostics return exit 0. Use a caller query inside your client to check its connection.
+
+`gate --report-only` retains the regression verdict but returns exit 0 for a completed, validated finding. Usage errors, failed analysis, missing refs, and interruptions still fail.
+Blocking is the default. See [the gate guide](ci-gate.md) for Action inputs and output codes.
+
+### Directories with a reserved name
+
+Bare `setup`, `doctor`, `review`, and `gate` select subcommands. To map a directory with one of these names, use an explicit path or the `--` delimiter:
+
+```sh
+codeweb ./review
+codeweb /absolute/path/to/review
+codeweb -- review
+```
+
 ## Exit codes
 
 | code | meaning |
 |---|---|
 | 0 | success — for `simulate-edit` this includes a BLOCK prediction (the verdict is in the payload, it's a pre-flight) |
 | 1 | the tool's finding fired: `diff`/`ci-gate`/`review --gate`/`fitness` found a regression; `query`-family symbol not found; a pipeline stage failed |
-| 2 | usage, IO, or setup: bad flag, missing file, unmapped directory, wrong-path target, Node < 22 |
+| 2 | usage, IO, setup, or inconclusive analysis: inspect the error or structured diagnostics; never treat it as a clean gate |
 
 ## Environment variables
 
@@ -49,10 +81,11 @@ here (or anywhere else in codeweb) transmits anything.
 | variable | effect |
 |---|---|
 | `CODEWEB_WS` | workspace override: tools read `$CODEWEB_WS/graph.json` instead of walking up to the nearest `.codeweb/` |
-| `CODEWEB_NO_STATS=1` | disable the local outcome ledger (`.codeweb/stats.json`) entirely — the privacy lever |
+| `CODEWEB_NO_STATS=1` | disable the local outcome ledger (`.codeweb/stats.json`) entirely — the privacy lever (also suppresses the upgrade lines below) |
+| `CODEWEB_NO_PROMO=1` | suppress every upgrade placement: the gate comment's org-dashboard line, the trend nudge at 5+ snapshots, and the sponsor ask. Attribution footers stay |
 | `CODEWEB_ENGINE` | pin the extraction engine (`ts` \| `regex`) instead of auto-detection |
 | `CODEWEB_NO_AUTOREFRESH=1` | MCP server stops auto-refreshing stale graphs before answering |
-| `CODEWEB_MCP_TRACE=1` | MCP server logs every JSON-RPC frame to stderr |
+| `CODEWEB_MCP_TRACE=1` | MCP server logs queue lifecycle events (start/end/kill/skip-autorefresh) as NDJSON to stderr |
 | `CODEWEB_HOOK_INPROC=0` | post-edit hook falls back to the child-process extraction path (rollback lever) |
 | `CODEWEB_VERIFY_FRESHNESS=1` | re-verify stage-memo reuse against the sources instead of trusting stamps |
 | `CODEWEB_LSH=0` | overlap candidate generation falls back to the pre-LSH exhaustive path |
@@ -64,6 +97,209 @@ here (or anywhere else in codeweb) transmits anything.
 | `CODEWEB_DEADCODE_LEGACY=1` | deadcode reverts to the pre-H13 tiering (test-file-defined symbols not protected) |
 | `CODEWEB_VERBOSE=1` | run.mjs restores optimize's full advisory dump instead of the 3-line headline |
 | `CODEWEB_TIMING=1` | print per-phase timings in the extractor |
-| `CODEWEB_BIN` | editor-link binary the report's "open in editor" uses (default `code`) |
+| `CODEWEB_BIN` | set to `1` by the `bin/` shims so the server's main-guard fires when invoked through a bin entry (internal signal — not an editor setting) |
 | `CODEWEB_CHROMIUM` | Chromium executable for `screenshot.mjs` |
 | `TS_MODULE` | path to a `typescript` module for the bench's token grading |
+
+## Context analysis status
+
+`codeweb_context` and `context-pack.mjs --json` include an `analysis` object:
+
+- `scope: "mapped-call-graph"`: counts describe mapped call edges. Imports,
+  inheritance, tests, and references are available through `codeweb_dependents`.
+  Neither a full response nor an unchanged map proves all runtime callers are known.
+- `freshness`: `stale` preserves the existing `stale` detail; `unchanged-stamps`
+  means the recorded stamps showed no change; `unknown` means source access or
+  nonempty source stamps were unavailable. Stamp checking is not a completeness
+  audit. `CODEWEB_VERIFY_FRESHNESS=1` also checks recorded content hashes.
+- `listsComplete`: whether all mapped callers, callees, and impact IDs are shown.
+  Existing `moreCallers` / `moreCallees` and new `blastRadius.more` count omissions.
+  Context has no offset argument: increase `limit` / `--limit`, or use MCP
+  `full:true` to remove list budgets.
+- `sourceEvidenceComplete`: whether the returned targets have bodies and each
+  returned caller has uncapped label-match evidence (or a body in full-body mode).
+  This concerns returned items only; it is independent of `listsComplete`.
+- `limitations` contains stable reason codes; `nextSteps` gives corresponding
+  recovery or inspection actions, including exported contracts and dynamic calls.
+
+Each caller in window mode carries `windowEvidence`: `shown`, `truncated`,
+`no-label-match`, or `source-unavailable`. When source can be searched,
+`matchedLines`, `shownLines`, and `remaining` describe matching **lines**, not
+verified call sites. Windows use lexical label matches within recorded spans;
+comments can match and aliases can be missed.
+
+At most eight matching lines per caller seed the windows. MCP `full:true` removes list budgets but retains that
+cap; use `bodies:"full"` (CLI `--full-bodies`) or inspect the file to see the rest.
+
+Missing source must be restored; stale spans require a refresh. No numeric
+confidence or whole-repository completeness score is inferred from these signals.
+
+
+## Before and after an edit
+
+**Available in Codeweb 0.15.0 and later:** `baseline:true`, `--baseline`, diff
+`refresh:true` / `--refresh`, and the analysis fields below. For an installed-binary
+example, use the [npm quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart).
+
+CLI examples in this section run from the Codeweb checkout. For another target, pass
+its absolute `.codeweb/graph.json` path instead of the relative example.
+
+Capture a fresh baseline **before** changing source:
+
+```text
+MCP: codeweb_refresh {baseline:true}
+CLI: node scripts/refresh.mjs .codeweb/graph.json --baseline --json
+```
+
+This saves `graph.baseline.json` after successful extraction. Ordinary refresh,
+background auto-refresh, and `snapshot:true` leave it intact. Calling
+`baseline:true` again explicitly starts a new edit and replaces it; finish the
+current comparison first. Baselines are local workspace state, not committed history.
+
+After editing, refresh and compare in one action:
+
+```text
+MCP: codeweb_diff {before:"baseline", refresh:true}
+CLI: node scripts/diff.mjs baseline .codeweb/graph.json --refresh --json
+```
+
+MCP serializes extraction and comparison as one workspace writer operation.
+`verification` names the baseline, its SHA-256, and the refreshed graph. A missing,
+invalid, or different-root baseline fails before refreshing. Losing a pre-edit
+baseline cannot be repaired by capturing already-edited source.
+
+The legacy `refresh {snapshot:true}` → `diff {}` loop remains available. It compares
+with the graph just before that refresh, which may already include edits after an
+automatic refresh. Use the explicit baseline flow for a stable comparison across
+mid-edit queries. Without `refresh:true`, diff still compares stored snapshots only.
+
+`analysis.checks` distinguishes evaluated graph checks from missing analysis.
+Refresh drops overlap findings, so diff reports duplication as `not-evaluated`
+and does not claim that old findings disappeared. Run the full pipeline for both
+snapshots or use `codeweb_review` with `gate:true` for a bounded scan of changed
+symbols.
+
+Review preserves its boolean `analysis.checks` fields and labels per-check scope in
+`analysis.checkStatus`.
+
+`ok:true` means no regressions were found by the checks performed. It does not
+mean every check ran or that behavior is correct. Inspect `analysis` and run the
+relevant tests. The existing exit codes remain 0 for no detected regressions,
+1 for regressions, and 2 for setup or IO failures.
+
+## Setup diagnostics
+
+Run `codeweb --doctor --json` (or `node scripts/doctor.mjs --json`) to inspect the
+running installation without creating a map. An optional target directory checks
+that project's setup. The standalone script also accepts `--graph <path>`.
+
+The result includes package root, version, checkout/packaged origin, entrypoint,
+Node executable, and Codeweb executables found on PATH. Compare these paths when
+a global package and a development checkout behave differently: a packaged install
+is a snapshot, even when it shares the checkout's version number.
+
+Diagnostics report graph discovery, recorded source root, freshness, and optional
+parser availability. Parser probes check availability, not successful grammar
+initialization. Missing optional AST support is a warning; regex extraction
+remains available. Missing or invalid graph/source setup exits 2; stale or
+unstamped graphs produce warnings with repair guidance.
+
+Repair commands use explicit argument arrays in `issues[].command`, avoiding
+ambiguous quoting. Diagnostics never install dependencies, remap code, modify
+workspace artifacts, or contact a package registry.
+
+The package subcommand `codeweb doctor` additionally checks the local MCP handshake
+and optional explicit client configuration. Its required freshness checks can fail when
+source stamps are unavailable. The `codeweb --doctor` flag and explicit-target script
+form provide lightweight installation/map diagnostics; they do not verify a client connection.
+
+## Known incomplete extraction
+
+Find, explain, context and risk retain useful results on partial maps. JSON includes `analysis.status: incomplete`, scope, freshness and bounded `analysis.completeness` diagnostics. MCP uses the same contract. A missing match in a partial map does not establish absence from source. Protocol and file-reading failures remain separate errors.
+
+Tool answers show up to three diagnostic samples with uncapped counts and explicit omitted counts. Comparisons retain a sample from each incomplete snapshot. Additional stored samples remain in each graph's `meta.analysis.diagnostics`; budgeting never changes the gate's inconclusive status.
+
+Known unsupported same-line JS/TS declarations, unresolved local JSX targets and ambiguous
+call candidates are recorded in `graph.meta.analysis`.
+An `incomplete` status includes an exact diagnostic count and at most 20 samples with
+file, line, column, and masked-source evidence. Strings and comments are not copied
+into those samples. An unflagged graph does not prove complete syntax coverage.
+
+JSX renders resolve through local declarations and supported imports. Known function values
+in callbacks, containers and handler registration produce `ref` edges; direct callers remain
+call-only. Impact follows call, inheritance and reference users transitively.
+
+The deadcode `safe` key is a legacy structural tier. Incomplete maps, detected dynamic
+dispatch and JSX component-like orphans require review and supply no deletion proposals.
+
+New evidence receipts use relation version 2 for reference-aware impact witnesses.
+Version 1 records remain readable; reconciliation across analyzer versions is inconclusive
+and preserves the original receipt.
+
+Diff and review comparisons involving a diagnosed incomplete snapshot return
+`ok:false`, `status:"inconclusive"`, diagnostics in `analysis.completeness`, and exit 2.
+Inspect the locations and callers in source; this result cannot establish a clean gate.
+MCP preserves structured inconclusive results. Existing complete-baseline regressions
+return exit 1; a comparison with no detected regression or incompleteness returns 0.
+
+Diagnostics survive caches and refreshes. Both comparison snapshots matter: repairing
+the current source does not validate an incomplete baseline. Recover and inspect the
+pre-edit source before starting a new baseline; never replace it merely to turn a
+failed comparison green. Skipped duplication checks and behavioral limits still apply.
+
+
+Graphs saved by older versions are not retroactively audited for these diagnostics.
+Refresh or remap before relying on them. To audit an old baseline, restore its pre-edit
+source revision and remap that revision; do not overwrite it from edited source.
+
+## Task-owned evidence receipts (source checkout / package scripts)
+
+Capture the mapped evidence for one unambiguous symbol before editing:
+
+```sh
+node scripts/context-pack.mjs .codeweb/graph.json target --capture-evidence --task edit-42 --json
+```
+
+The response supplies `receiptId`. After editing, pass that ID and the same task to review:
+
+```sh
+node scripts/review.mjs .codeweb/graph.json --changed src/example.js --receipt <receiptId> --task edit-42 --json
+```
+
+Use the existing `--before <graph>` and `--gate` workflow independently for the structural
+verdict. Evidence reconciliation does not refresh or replace the graph used by that verdict.
+Read `evidence.state` separately from `verdict.ok` and the exit code: a clean review can have
+changed, inconclusive or unavailable evidence. The response identifies both snapshots.
+
+Read an immutable section, following its `nextOffset` until null:
+
+```sh
+node scripts/context-pack.mjs .codeweb/graph.json target --receipt <receiptId> --task edit-42 --section callers --offset 0 --json
+```
+
+Add `--result <resultId>` for a reconciliation result section (`added`, `removed`,
+`witnessChanged`, `questions`). Receipt sections are `callers`, `callees`, `impact`, `questions`.
+Pages describe recorded evidence, not current source. Capture/page envelopes and the review's
+new evidence field are capped at 8 KiB; oversized item details have explicit local record locators.
+
+MCP equivalents use the existing tools:
+
+- `codeweb_context {symbol:"target", captureEvidence:true, task:"edit-42"}`
+- `codeweb_review {changed:"src/example.js", evidenceReceipt:"<receiptId>", task:"edit-42"}`
+- `codeweb_context {symbol:"target", evidenceReceipt:"<receiptId>", task:"edit-42", evidenceSection:"callers", evidenceOffset:0}`
+
+The private `native-regex-snapshot-v1` profile reads captured source bytes with ctags/AST/cache
+disabled. It uses fixed directory exclusions and includes hidden source files; it does not apply
+ignore files. Its evidence may differ from the ordinary saved graph, and it never executes target
+code.
+
+Questions remain unresolved, need rechecking, or become no-longer-observed; none of these
+establishes behavioral correctness. Renamed/missing targets require explicit recapture.
+
+Records live under the graph directory's `evidence/v1` (2 MiB each, 32 MiB total). Identical records
+reuse their ID; there is no automatic cleanup. Deliberately remove unwanted records when the store
+fills.
+
+Remove a stale `.lock` only after confirming no evidence writer is active. Clearing evidence
+records does not clear maps, graph baselines, or hook state. Restart a long-lived process after
+updating analyzer files before capturing more evidence.

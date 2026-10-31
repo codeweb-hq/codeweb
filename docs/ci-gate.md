@@ -4,11 +4,21 @@ The gate fails a pull request when an edit introduces one of these structural re
 
 - a **new dependency cycle**
 - a **new duplication finding**
-- a **non-exported symbol that loses every caller**
+- an **existing non-exported symbol that becomes an orphan with no mapped callers**
 
 Exported symbols are exempt from the pull-request gate. The edit simulation and post-edit hook
 also flag exported symbols as `check: call-caller-preflight`. The gate runs the same verdict as
 `scripts/diff.mjs` on each pull request.
+
+These checks cover the mapped graph, not all runtime
+dependencies. Diff responses report `analysis.checks`: a skipped check is not a
+pass. Refresh drops overlap evidence and leaves duplication unevaluated; a full pipeline
+rebuild includes overlap analysis. Structural green does not establish behavioral correctness.
+
+Known unsupported same-line JS/TS declarations make the gate inconclusive (exit 2).
+The comment names diagnostic source locations instead of reporting a clean result.
+Both snapshots matter: repair does not make an incomplete baseline trustworthy.
+See [analysis completeness](cli.md#known-incomplete-extraction).
 
 ## Add it to your repo
 
@@ -27,14 +37,39 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # required — the gate diffs against the PR base sha
-      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@main
+      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@v0.16.0
         with:
           target: src             # subdirectory to analyze (default: .)
+          codeweb-ref: v0.16.0    # pin the engine too — see below
           comment: true           # post the structural review as a sticky PR comment
+          history: true           # keep a cross-PR trend line in the comment (Actions cache)
 ```
 
 `fetch-depth: 0` is **required**: the gate materializes the PR base commit to build the "before"
 graph, so the full history must be present.
+
+**Pin the action to a release tag** (`@v0.14.0`-style, as above), not `@main` — a moving ref can
+change your gate's verdict semantics under you. Pin the engine as well: `codeweb-ref` accepts a
+branch, tag, or commit sha, and it defaults to `main` so the zero-config path keeps working.
+
+Pin both to the same tag. The Action ref selects the workflow steps; `codeweb-ref` selects the
+engine those steps clone and run. Left unpinned, either one can move under a green build.
+
+**Monorepos:** the gate analyzes one `target` per invocation. Gate several packages with a
+matrix — each package gets its own verdict, comment, and (with `history: true`) its own trend:
+
+```yaml
+    strategy:
+      matrix:
+        target: [packages/api, packages/web]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: GhostlyGawd/codeweb/.github/actions/codeweb-gate@v0.16.0
+        with:
+          target: ${{ matrix.target }}
+          codeweb-ref: v0.16.0
+```
 
 ## The gate as a reviewer (`comment: true`)
 
@@ -44,6 +79,18 @@ cycles, and duplication findings.
 
 The digest also identifies each blocker and gives the local reproduction command. Reviewers can
 inspect the pull request's blast radius without installing codeweb.
+
+Findings include source locations, bounded duplication evidence and confidence when available,
+and investigation steps. With GitHub context, clean checkouts link to the checked-out commit and include
+the configured target subdirectory. Dirty checkouts or a HEAD change during analysis fall back to
+file-and-line locations, so a link cannot imply uncommitted code exists in that commit.
+
+Local digests without GitHub context also use plain locations. Large finding
+lists, cycle members, and duplication sites show explicit omitted counts.
+
+The comment also states the analysis limits: a passing structural gate does not establish
+behavioral correctness, and no mapped callers does not prove a symbol is unused. Check entry
+points and dynamic dispatch before removing code, and run the relevant tests.
 
 - Requires `permissions: pull-requests: write` in the calling workflow (shown above) and a
   `pull_request` event. Without either, the comment is skipped with a warning and the **check
@@ -64,8 +111,59 @@ wiring them).
 
 ## Run it locally
 
-```
-node scripts/ci-gate.mjs --base <ref> [--repo <path>] [--target <subdir>]
+From the project directory, use the installed package:
+
+```sh
+npx -y @ghostlygawd/codeweb gate --base origin/main --target src
 ```
 
 `--base` is any git ref (a branch, tag, or sha) to compare the current working tree against.
+
+
+A source checkout can run `node scripts/ci-gate.mjs` with the same options.
+A passing gate means only that the named structural rules found no regression. It does not prove runtime correctness or complete analysis of dynamic calls.
+
+## Start with report-only checks
+
+Use report-only mode to inspect findings before you enable blocking:
+
+```sh
+npx -y @ghostlygawd/codeweb gate --base origin/main --target src --report-only
+```
+
+The structural verdict and Markdown digest keep the regression finding. Only a completed regression changes from exit 1 to exit 0 in report-only mode.
+Missing refs, failed graph builds, usage errors, and interrupted analysis still fail. Blocking remains the default.
+
+For the Action, add `report-only: true` under `with:`. Use an Action ref and matching engine ref that contain this option; earlier releases do not support it.
+The Action keeps the original gate exit code in its `verdict-code` output: 0 for clean, 1 for regression, and 2 for setup or analysis error.
+
+## Check setup before the first query
+
+Run these commands from your project directory:
+
+```sh
+npx -y @ghostlygawd/codeweb setup --client cursor
+npx -y @ghostlygawd/codeweb .
+npx -y @ghostlygawd/codeweb doctor --client cursor --config .cursor/mcp.json --json
+```
+
+`setup` prints a recipe without writing configuration. Choose `claude`, `cursor`, `windsurf`, `gemini`, or `codex`; merge the printed server entry into the named file and keep existing entries.
+To remove the setup, remove only the `codeweb` server entry that you added.
+
+`doctor` checks Node, the installed local MCP server, graph presence, and recorded source freshness. Its JSON lists named `pass`, `fail`, or `unknown` checks and an `ok` result.
+Required failures or unverified freshness return exit 2. A successful local check returns exit 0; editor connection always remains unverified.
+
+The optional `--client` and `--config` flags must be used together. Diagnostics inspect only that supplied file, never execute its command, and never print its values.
+The Codex check supports the basic TOML recipe from `setup`. Other TOML forms can return `unknown`; this means the check cannot verify that syntax.
+
+### Prove a caller query
+
+Use a small source file, such as `src/example.js`:
+
+```js
+export function add(a, b) { return a + b; }
+export function twice(x) { return add(x, x); }
+```
+
+Build its map with `npx -y @ghostlygawd/codeweb src --out-dir .codeweb`, then ask your connected agent to call `codeweb_callers` with `{"symbol":"add"}`.
+The result must name `twice` as a caller. This query checks the editor connection and the map answer; the local doctor handshake alone cannot check the editor connection.

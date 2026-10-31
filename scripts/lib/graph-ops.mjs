@@ -1,3 +1,4 @@
+import { incompleteAnalysis } from './analysis-completeness.mjs';
 // codeweb shared graph primitives — pure functions over a graph.json object (see graph-schema.md).
 // Imported by scripts/query.mjs and scripts/diff.mjs so the call/cycle/orphan logic lives ONCE
 // (codeweb dogfooding its own anti-duplication mission). No I/O, no process.exit — callers own
@@ -85,6 +86,20 @@ export function compileRoleOverrides(roles) {
 
 // Fill the same defaults build-report.mjs applies, so every consumer sees a well-formed graph.
 export function normalizeGraph(graph) {
+  // Missing optional fields occur in legacy maps; a malformed node collection is
+  // not an empty map. Keep invalid input distinct from a valid selector miss.
+  const invalid = (detail) => { const e = new Error(`invalid graph: ${detail}`); e.code = 'INVALID_GRAPH'; throw e; };
+  if (!graph || typeof graph !== 'object' || Array.isArray(graph)) invalid('expected an object');
+  if (graph.nodes !== undefined && !Array.isArray(graph.nodes)) invalid('nodes must be an array');
+  if (graph.edges != null && !Array.isArray(graph.edges)) invalid('edges must be an array');
+  if (graph.meta != null && (typeof graph.meta !== 'object' || Array.isArray(graph.meta))) invalid('meta must be an object');
+  for (const n of graph.nodes || []) {
+    if (!n || typeof n !== 'object' || Array.isArray(n) || typeof n.id !== 'string' || !n.id) invalid('each node needs a nonempty string id');
+    for (const k of ['file', 'label', 'kind']) if (n[k] != null && typeof n[k] !== 'string') invalid(`node ${k} must be a string`);
+  }
+  for (const e of graph.edges || []) {
+    if (!e || typeof e !== 'object' || Array.isArray(e) || typeof e.from !== 'string' || typeof e.to !== 'string') invalid('each edge needs string from/to ids');
+  }
   const g = graph || {};
   g.meta = g.meta || {};
   g.nodes = asArray(g.nodes);
@@ -236,9 +251,9 @@ export const dependentsOf = (index, ids) => {
 export const fanInOf = (index, id, withImports = false) =>
   (index.callIn.get(id)?.size || 0) + (withImports ? (index.importIn.get(id)?.size || 0) : 0);
 
-// Transitive reverse-call closure (blast radius) from all seeds, excluding the seeds themselves.
-// Reverse-reachability over callers AND subclasses: changing a node affects what calls it and
-// what inherits from it. finding 9: index-pointer queue (shift() was O(frontier) per pop — O(n²)
+// Transitive mapped-consumer closure from all seeds, excluding the seeds themselves.
+// Reverse-reachability includes calls, inheritance and function/class references.
+// finding 9: index-pointer queue (shift() was O(frontier) per pop — O(n²)
 // on big radii; measured 19.9s -> 0.3s on a 240k-node closure) and no per-visit array merge.
 export function impactOf(index, seedIds) {
   const seeds = new Set(seedIds);
@@ -250,6 +265,8 @@ export function impactOf(index, seedIds) {
     if (callers) for (const dep of callers) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
     const subs = index.inheritIn?.get(cur);
     if (subs) for (const dep of subs) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
+    const refs = index.refIn?.get(cur);
+    if (refs) for (const dep of refs) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
   }
   return [...visited].filter((id) => !seeds.has(id)).sort();
 }
@@ -266,6 +283,8 @@ export function impactCountOf(index, seedIds) {
     if (callers) for (const dep of callers) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
     const subs = index.inheritIn?.get(cur);
     if (subs) for (const dep of subs) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
+    const refs = index.refIn?.get(cur);
+    if (refs) for (const dep of refs) if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
   }
   return visited.size - seeds.size;
 }
@@ -289,7 +308,7 @@ export function allBlastCounts(index) {
     return i;
   };
   for (const id of index.byId.keys()) intern(id);
-  for (const adj of [index.callIn, index.inheritIn]) {
+  for (const adj of [index.callIn, index.inheritIn, index.refIn || new Map()]) {
     for (const [to, froms] of adj) { intern(to); for (const f of froms) intern(f); }
   }
   const N = ids.length;
@@ -299,6 +318,8 @@ export function allBlastCounts(index) {
     if (callers) for (const d of callers) out.push(idx.get(d));
     const subs = index.inheritIn.get(id);
     if (subs) for (const d of subs) out.push(idx.get(d));
+    const refs = index.refIn?.get(id);
+    if (refs) for (const d of refs) out.push(idx.get(d));
     return out;
   });
 
@@ -606,9 +627,11 @@ export function gateVerdict(before, after, { exemptExported = false, newDuplicat
     newCycles = sr.newCycles;
     lostCallers = sr.lostCallers.map((id) => ({ id, exported: aExports.get(id) || false, exempted: false }));
   }
+  const incomplete = incompleteAnalysis(before, after);
   const blocking = lostCallers.filter((l) => !l.exempted);
   return {
-    ok: newCycles.length === 0 && blocking.length === 0 && !(newDuplications && newDuplications.length),
+    ok: !incomplete && newCycles.length === 0 && blocking.length === 0 && !(newDuplications && newDuplications.length),
+    ...(incomplete ? { status: 'inconclusive', analysis: incomplete } : {}),
     check: exemptExported ? 'orphan-gate' : 'call-caller-preflight',
     scope,
     checks: { newCycles, lostCallers, ...(newDuplications !== null ? { newDuplications } : {}) },

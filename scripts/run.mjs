@@ -36,12 +36,13 @@ const VERSION = (() => { try { return JSON.parse(readFileSync(join(ROOT, 'packag
 
 // Bump when ANY downstream stage (cluster/overlap/optimize/report) changes behavior — it keys the
 // stage memo, so an old workspace can never serve outputs computed by an older pipeline.
-const MEMO_VERSION = 1;
+const MEMO_VERSION = 2;
 
 const USAGE = `usage: run.mjs [<SRC>] [--target <label>] [--out-dir <dir>] [--open] [--full] [--allow-empty] [--json]
   <SRC>            path to the codebase to map (default: current directory)
   --target <label> display label stamped into the map (default: last two path segments of <SRC>)
   --out-dir <dir>  where the artifacts go (default: <SRC>/.codeweb — where MCP + hooks find them)
+  --doctor         diagnose this installation and target without creating or changing a map
   --open           open report.html when the map is built
   --serve          after the map, serve the workspace at http://127.0.0.1:<port> (localhost only)
   --full           recompute every stage (skip the fragment memo + edge cache)
@@ -50,7 +51,14 @@ const USAGE = `usage: run.mjs [<SRC>] [--target <label>] [--out-dir <dir>] [--op
                    reused, version}); stage progress stays on stderr
   --stages <phase> partial pipeline; only 'through-overlap' (extract+cluster+overlap, skip
                    optimize+report) — the trend fast path; never writes the stage memo
-  --coverage <p>   annotate the graph with a coverage report (lcov or c8 JSON) after mapping`;
+  --coverage <p>   annotate the graph with a coverage report (lcov or c8 JSON) after mapping
+
+Package commands:
+  codeweb setup --client <client>  print a project setup recipe
+  codeweb doctor                  check local setup and graph state
+  codeweb review <graph>           review a change; add --help for options
+  codeweb gate --base <ref>        check structural changes against a git ref
+  codeweb -- review               map a directory named review (or use ./review)`;
 // finding 24: THE flag loop (lib/cli.mjs parseArgs). This file pioneered the unknown-flag
 // rejection (#5: `--help` once became the target path); the shared loop carries that policy now.
 const { opts: flags, pos } = parseArgs(process.argv.slice(2), {
@@ -58,6 +66,7 @@ const { opts: flags, pos } = parseArgs(process.argv.slice(2), {
   flags: {
     target: { type: 'string', default: null },
     'out-dir': { type: 'string', default: null },
+    doctor: { type: 'bool', default: false },
     open: { type: 'bool', default: false },
     serve: { type: 'bool', default: false },         // AI-IDEAS/reach: give the report a real origin, localhost only
     full: { type: 'bool', default: false },
@@ -67,6 +76,13 @@ const { opts: flags, pos } = parseArgs(process.argv.slice(2), {
     json: { type: 'bool', default: false },          // CLI.md 5.1: the flagship's machine mode
   },
 });
+// AC-24: diagnostics exits before target validation, mkdir, extraction, or history writes.
+if (flags.doctor) {
+  const { runDoctor } = await import('./doctor.mjs');
+  process.exitCode = runDoctor({ target: pos[0] || '.', json: flags.json });
+  process.exit(process.exitCode);
+}
+
 // FUNNEL #2 / FORMS cut #4: the main form has zero required fields. <SRC> defaults to the
 // current directory; the empty-target guard downstream keeps a wrong cwd from producing a
 // silent nonsense map.
@@ -87,6 +103,10 @@ const partial = opts.stages === 'through-overlap';
 // a .codeweb directory on the way out.
 opts.src = resolve(opts.src);
 if (!existsSync(opts.src)) { console.error(`[run] target not found: ${opts.src}`); process.exit(2); }
+if (!opts.outDir && statSync(opts.src).isFile()) {
+  console.error(`[run] target is not a directory: ${opts.src}; point at the containing code directory (for example: codeweb .).`);
+  process.exit(2);
+}
 // FORMS F9: --coverage names a FILE — check it now, not after five stages of work on a large
 // repo (the map used to build fully, then die on an lcov typo with an "aborting" frame that
 // hid the map's success).
@@ -146,7 +166,7 @@ const run = (label, file, args, useEnv) => {
 // chatter under the CLI.md 6.1 stream contract), the dump lives in optimize.md with a one-line
 // pointer here; CODEWEB_VERBOSE=1 restores the firehose. Returns stdout so the banner can scrape
 // the ready/LOC pair.
-const runCapture = (label, file, args) => {
+const runCapture = (label, file, args, render) => {
   console.error(`\n[run] ${label}`);
   const t0 = Date.now();
   let out = '';
@@ -159,9 +179,11 @@ const runCapture = (label, file, args) => {
   }
   const lines = out.split('\n');
   const verbose = process.env.CODEWEB_VERBOSE === '1';
-  const shown = (verbose ? out : lines.slice(0, 3).join('\n')).trimEnd();
+  // D4b: a caller that consumes --json output supplies `render` (the human lines to show);
+  // the default stays the classic 3-line prose peek.
+  const shown = (render ? render(out, verbose) : (verbose ? out : lines.slice(0, 3).join('\n'))).trimEnd();
   if (shown) console.error(shown);
-  if (!verbose && lines.length > 4) console.error(`  full advisory: ${join(ws, 'optimize.md')}`);
+  if (!render && !verbose && lines.length > 4) console.error(`  full advisory: ${join(ws, 'optimize.md')}`);
   console.error(`[run] ${label} done in ${Date.now() - t0}ms`);
   return out;
 };
@@ -237,16 +259,26 @@ if (reusable) {
     // partial workspace lacks optimize.md/report.* so it must never satisfy a later full run's memo.
     console.error('\n[run] --stages through-overlap: skipping optimize + report (memo not written)');
   } else {
-    const optOut = runCapture('optimize', S('scripts/optimize.mjs'), [join(ws, 'graph.json'), '--out', join(ws, 'optimize.md')]);
+    // D4b (SIMPLIFY §2.5): optimize emits --json and the banner reads payload.totals — a prose
+    // wording tweak can no longer silently blank the ready/LOC fields. Humans keep a headline
+    // (rendered here from the same payload); CODEWEB_VERBOSE=1 shows the full advisory from
+    // optimize.md, where the dump already lives.
+    const optOut = runCapture('optimize', S('scripts/optimize.mjs'), [join(ws, 'graph.json'), '--json', '--out', join(ws, 'optimize.md')], (out, verbose) => {
+      if (verbose) { try { return readFileSync(join(ws, 'optimize.md'), 'utf8'); } catch { return out; } }
+      try {
+        const t = JSON.parse(out).totals;
+        return `codeweb optimize: ${t.findings} actionable finding(s) · ${t.ready} ready · ${t.blocked} blocked · ${t.review} judgement · ~${t.locReclaimable} LOC reclaimable\n  full advisory: ${join(ws, 'optimize.md')}`;
+      } catch { return ''; }
+    });
     run('report', S('scripts/build-report.mjs'), [join(ws, 'graph.json'), ...(opts.open ? ['--open'] : [])], false);
-    const headline = optOut.match(/(\d+) actionable findings · (\d+) ready · (\d+) blocked · (\d+) judgement/);
-    const locM = optOut.match(/~(\d+) LOC reclaimed/);
+    let optTotals = null;
+    try { optTotals = JSON.parse(optOut).totals; } catch { /* banner degrades to graph buckets */ }
     // ONE parse of the final graph feeds the banner, the history row, and the delta.
     let freshGraph = null;
     try { freshGraph = JSON.parse(readFileSync(join(ws, 'graph.json'), 'utf8')); } catch { /* banner/delta degrade */ }
     if (freshGraph) {
       banner = { symbols: freshGraph.meta?.stats?.nodes ?? (freshGraph.nodes || []).length, ...findingBuckets(freshGraph.overlaps) };
-      if (headline) { banner.ready = Number(headline[2]); if (locM) banner.loc = Number(locM[1]); }
+      if (optTotals) { banner.ready = optTotals.ready; if (optTotals.locReclaimable) banner.loc = optTotals.locReclaimable; }
       // R1/R8: one appended row per FULL map — brief/trend/report read the series; reused
       // (memo-hit) runs never reach here, so the ledger records real recomputes only.
       const freshRow = metricsRow(freshGraph);
@@ -332,13 +364,23 @@ if (opts.json) {
         }
       } catch { /* the ask must never break the pipeline */ }
     } else {
-      // ACTIVATION A5: first map of this repo — the three moves that turn one run into a habit.
-      // #5 still holds: the map's whole point is to be LOOKED AT, so seeing it is step 1.
+      // First use leads with the agent's edit/check loop; the map supports it.
       const openCmd = process.platform === 'win32' ? 'start ""' : process.platform === 'darwin' ? 'open' : 'xdg-open';
       console.log(`[run] next:`);
-      console.log(`[run]   1. ${opts.open ? 'the map is opening in your browser' : `see the map: ${openCmd} ${join(ws, 'report.html')}`}`);
-      console.log(`[run]   2. live queries in Claude Code: claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp`);
-      console.log(`[run]   3. after edits: re-run codeweb here — the refresh is cache-warm (seconds, not a re-map)`);
+      console.log(`[run]   1. connect your agent: claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp (other clients: https://codeweb-hq.github.io/codeweb/start.html#other-clients)`);
+      console.log(`[run]   2. BEFORE edits: codeweb_refresh {baseline:true}, then codeweb_explain / codeweb_dependents for the symbol`);
+      console.log(`[run]   3. AFTER edits: codeweb_diff {before:"baseline",refresh:true}; repair and re-run this diff against the same baseline — do not capture another baseline during repair`);
+      console.log(`[run]      Read analysis.checks for skipped checks; green structure does not prove behavior. Run your product tests.`);
+      console.log(`[run]      Try the cycle walkthrough: https://codeweb-hq.github.io/codeweb/start.html#cycle-walkthrough`);
+      console.log(`[run]      Supporting view: ${opts.open ? 'the map is opening in your browser' : `see the map: ${openCmd} ${join(ws, 'report.html')}`}`);
+      // GRW-F4: the CI gate is the team-lead doorway (and the one surface with a distribution
+      // trigger defined on it), yet no in-product moment ever said it exists. Say it exactly
+      // where an activated user with a CI setup is already looking.
+      try {
+        if (existsSync(join(resolve(opts.src), '.github'))) {
+          console.log(`[run]   4. gate your PRs on this structure: https://codeweb-hq.github.io/codeweb/product.html#ci-gate`);
+        }
+      } catch { /* the nudge must never break the pipeline */ }
     }
   }
 }

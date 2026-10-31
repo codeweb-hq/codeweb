@@ -1,0 +1,23 @@
+{
+  "source": "docs/demo/index.html",
+  "graph": "docs/demo/axios.graph.json",
+  "sourceCommit": "a209bfb1e5dcbce3cecbf4bd955339d006358887",
+  "extractorVersion": "0.16.0",
+  "rendererVersion": "0.16.0",
+  "inspected_images": [
+    "axios-graph.png",
+    "axios-blast-radius.png",
+    "axios-findings.png",
+    "axios-treemap.png",
+    "axios-matrix.png"
+  ],
+  "images": {
+    "axios-graph.png": "b25f10ff29562f89c52c8b00abb891fe6e77b5a2c5fbaee760a5491932f63ed7",
+    "axios-blast-radius.png": "fbd5bf35e1b1313d16509f25fa2b9fdc07ea5cf9141de98e4176a1635617d079",
+    "axios-findings.png": "310ce2ef22b279f49ce52dbaffc23bd96166ce4ebbe8df52410ea7e919a184ff",
+    "axios-treemap.png": "acb8027281a8e1fa7a2fa95e802524923320fa4634c28ac20221a7c18d8a9490",
+    "axios-matrix.png": "3d8a6144141f9e45c01d695faec44b3e5aab241d42be1d2c4e6b69c756643292"
+  },
+  "template_sha256": "ca662b30e314283e80c1cdabaa6a3869e49a0f34f476c4076415d606b913e3ad",
+  "scope": "Existing report design re-rendered from the pinned public Axios source; all five images visually inspected."
+}

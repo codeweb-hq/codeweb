@@ -10,16 +10,16 @@
 <meta property="og:site_name" content="codeweb">
 <meta property="og:title" content="codeweb changelog">
 <meta property="og:description" content="Every release, capability, benchmark, and fix — kept in lock-step with the product under Keep a Changelog and Semantic Versioning.">
-<meta property="og:url" content="https://ghostlygawd.github.io/codeweb/changelog.html">
-<meta property="og:image" content="https://ghostlygawd.github.io/codeweb/assets/og.jpg">
+<meta property="og:url" content="https://codeweb-hq.github.io/codeweb/changelog.html">
+<meta property="og:image" content="https://codeweb-hq.github.io/codeweb/assets/og.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="codeweb — interactive call-graph map of a codebase">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="google-site-verification" content="XtDZ8jymdrgm7ImH0L2hdtJ9Axy_B-9EnzLZk9pUMkQ">
 <meta name="theme-color" content="#060608">
-<link rel="canonical" href="https://ghostlygawd.github.io/codeweb/changelog.html">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"codeweb","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux (Node.js >= 22)","softwareVersion":"0.12.0","description":"Deterministic call/import graph of your codebase — 27 MCP tools for coding agents plus a self-contained interactive map. Runs entirely locally; reads code, never executes it.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/GhostlyGawd/codeweb","url":"https://ghostlygawd.github.io/codeweb/","sameAs":["https://github.com/GhostlyGawd/codeweb","https://www.npmjs.com/package/@ghostlygawd/codeweb"]}</script>
+<link rel="canonical" href="https://codeweb-hq.github.io/codeweb/changelog.html">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"codeweb","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux (Node.js >= 22)","softwareVersion":"0.16.0","description":"Deterministic call/import graph of your codebase — 28 MCP tools for coding agents plus a self-contained interactive map. Runs entirely locally; reads code, never executes it.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/GhostlyGawd/codeweb","url":"https://codeweb-hq.github.io/codeweb/","sameAs":["https://github.com/GhostlyGawd/codeweb","https://www.npmjs.com/package/@ghostlygawd/codeweb"]}</script>
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -30,13 +30,18 @@
     <span class="wm">code<span class="w">web</span></span>
   </a>
   <nav class="nav-links" aria-label="Primary">
-    <a href="index.html" data-nav="home">Home</a>
     <a href="product.html" data-nav="product">Product</a>
-    <a href="research.html" data-nav="research">Research</a>
-    <a href="start.html" data-nav="start">Get Started</a>
-    <a href="changelog.html" data-nav="changelog" aria-current="page">Changelog</a>
+    <a href="research.html" data-nav="research">Evidence</a>
+    <a href="start.html" data-nav="start">Get started</a>
   </nav>
   <div class="nav-right">
+    <details class="nav-more">
+      <summary>Plans</summary>
+      <div class="nav-menu">
+        <a href="boundary.html" data-nav="boundary">Free forever</a>
+        <a href="pricing.html" data-nav="pricing">Teams pricing intent</a>
+      </div>
+    </details>
     <a class="nav-ghost" href="demo/">Live demo</a>
     <a class="btn" href="https://github.com/GhostlyGawd/codeweb" rel="noopener">GitHub</a>
   </div>
@@ -52,6 +57,185 @@
       <div class="btn-row"><a class="btn" href="https://github.com/GhostlyGawd/codeweb/releases" rel="noopener">GitHub releases</a><a class="btn" href="https://github.com/GhostlyGawd/codeweb/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG.md</a></div>
     </div>
     <div class="prose changelog"><h2 class="cl-ver">[Unreleased]</h2>
+<p>Nothing yet. Open work lands here before it ships in the next tagged release.</p>
+<h2 class="cl-ver">[0.16.0] - 2026-10-02</h2>
+<h3 class="cl-grp">Fixed</h3>
+<ul>
+<li>Preserve live outer calls after block-local shadows and keep JSX text out of declaration discovery. Multiline callback bodies retain their enclosing function/arrow extents. Cleanup/campaign proposals no longer include the reproduced live-function and phantom-text cases.</li>
+<li>Resolve simple immutable callable aliases and literal Python decorator dependencies; qualify unsupported callable aliases and decorator factories. Respect parameter/callback bindings and ES namespace export surfaces, including cache invalidation on visibility changes.</li>
+<li>Keep useful partial find/explain/context/risk results on CLI and MCP with shared in-band completeness. Incomplete decision gates remain inconclusive.</li>
+<li>Map supported JSX component renders and known function values, including Python handler registration and JSX event properties. Impact follows reference consumers; direct-call answers expose reference users separately.</li>
+<li>Keep incomplete or dynamic maps and JSX component-like orphans out of deletion proposals. Preserve unresolved-target and ambiguous-call diagnostics through extraction caches.</li>
+</ul>
+<h3 class="cl-grp">Added</h3>
+<ul>
+<li>Bundle a focused <code>codeweb</code> coding skill for mapped caller inspection, reuse comparison and structural edit verification in Codex. Document the plugin installation path and recognize an installed <code>codeweb-mcp</code> binary in local configuration checks.</li>
+<li>Add opt-in local evidence receipts to context and review. Agents can compare previously mapped callers with a fresh source snapshot and read bounded historical pages. See <code>docs/cli.md</code>.</li>
+</ul>
+<h2 class="cl-ver">[0.15.0] - 2026-09-14</h2>
+<h3 class="cl-grp">Added</h3>
+<ul>
+<li>Explicit pre-edit baselines survive ordinary and automatic graph refreshes. Agents can</li>
+</ul>
+<p>  refresh and verify an edit in one diff call, then check repairs against the same baseline.</p>
+<ul>
+<li>Context responses distinguish list/source-evidence limits from graph uncertainty, with</li>
+</ul>
+<p>  actionable freshness and recovery information. Local setup diagnostics report installation,</p>
+<p>  graph discovery, source freshness and optional-parser availability without changing source.</p>
+<ul>
+<li>First-use instructions include a tested installed-package cycle walkthrough and a</li>
+</ul>
+<p>  baseline-preserving MCP workflow.</p>
+<h3 class="cl-grp">Fixed</h3>
+<ul>
+<li>Diagnostic masking recognizes regex statements after multiline control heads while</li>
+</ul>
+<p>  preserving division expressions, avoiding false incomplete-analysis reports.</p>
+<ul>
+<li>Package exclusions keep generated Python bytecode and verification-harness caches out</li>
+</ul>
+<p>  of the npm artifact, even after the verification suite has run.</p>
+<ul>
+<li>Refreshing verification rejects baselines without valid node and edge arrays before</li>
+</ul>
+<p>  changing the live graph. Baseline parsing and fingerprinting use the same bytes.</p>
+<ul>
+<li>Current documentation count checks include SPEC and recognize formatted counts and</li>
+</ul>
+<p>  Codeweb possessive phrasing while leaving dated audit and release records historical.</p>
+<ul>
+<li>Known unsupported same-line JavaScript/TypeScript declaration layouts now carry bounded</li>
+</ul>
+<p>  source diagnostics. Gates refuse an unqualified clean verdict when either snapshot has</p>
+<p>  detected incomplete analysis. This contains the reported false-clean result; it does not</p>
+<p>  claim complete syntax coverage or repair every omitted declaration.</p>
+<ul>
+<li>Gate comments use commit links only when the checkout is clean before and after analysis</li>
+</ul>
+<p>  and HEAD is unchanged; otherwise locations remain plain text. Comments include bounded</p>
+<p>  evidence and investigation guidance.</p>
+<ul>
+<li>Removed unsupported metadata keys from the shipped hook configuration while retaining</li>
+</ul>
+<p>  all three handlers and moving their descriptions into adjacent documentation.</p>
+<h3 class="cl-grp">Changed</h3>
+<ul>
+<li>Prominent guidance describes mapped-graph limits, exported-symbol exemptions, skipped</li>
+</ul>
+<p>  checks, and tested-client scope. Teams availability copy now reflects restricted GitHub</p>
+<p>  App access while preserving the ratified planned price and free-local boundary.</p>
+<ul>
+<li>Inconclusive analysis is a non-success result distinct from detected regressions; callers</li>
+</ul>
+<p>  must inspect diagnostics rather than interpreting an incomplete comparison as clean.</p>
+<h3 class="cl-grp">Documentation</h3>
+<ul>
+<li>Updated contributor guidance, operational graph-schema notes, and a documentation index</li>
+</ul>
+<p>  describe the required gate, ownership, provenance, freshness and missing data. Audit</p>
+<p>  indexes connect historical findings to implementation and verification records.</p>
+<h3 class="cl-grp">Verification scope</h3>
+<ul>
+<li>Runtime analysis remains deterministic, local and free of required third-party dependencies.</li>
+</ul>
+<p>  Optional parser installation is not a substitute for the incomplete-analysis checks.</p>
+<ul>
+<li>Structural results do not establish behavioral correctness. Run the relevant product tests.</li>
+</ul>
+<p>  Release-candidate test results and artifact hashes are recorded in the accompanying review.</p>
+<h3 class="cl-grp">Also added in product clarity</h3>
+<ul>
+<li>Package commands for client setup, local diagnostics, change review, and the existing CI gate.</li>
+<li>Portable change-review HTML with caller evidence, baseline provenance, and explicit analysis limits.</li>
+<li>Report-only gate mode that preserves regression verdicts and still fails on analysis errors.</li>
+<li>A reproducible edit-review demo, a dated Graphify comparison, and pilot and case-study protocols.</li>
+</ul>
+<h3 class="cl-grp">Changed</h3>
+<ul>
+<li>Public identity: “See what your AI edits affect.” and “Structural checks for AI code changes.”</li>
+<li>Setup uses shared recipes for five clients and shows an observable caller-query check.</li>
+<li>Findings separate body confidence from priority and provide source evidence and an agent task.</li>
+<li>The public Axios demo is re-extracted from a pinned commit with current engine provenance.</li>
+<li>Agent review details are bounded and report omitted counts; supporting HTML retains full evidence.</li>
+</ul>
+<h2 class="cl-ver">[0.14.0] - 2026-09-02</h2>
+<h3 class="cl-grp">Added</h3>
+<ul>
+<li><strong>C and C++ join as first-class languages — 13 native languages ship.</strong> Both follow the</li>
+</ul>
+<p>  existing per-language contract (<code>langOf</code> + rules, grammar dispatch, regex-tier fallback so the</p>
+<p>  AST tier stays optional, fixture-backed extractor suites). <code>tree-sitter-cpp.wasm</code> comes from</p>
+<p>  the already-pinned <code>@vscode/tree-sitter-wasm@0.3.1</code> (ABI 14); <code>tree-sitter-c.wasm</code> comes from</p>
+<p>  the tree-sitter org's own GitHub release v0.24.2 (ABI 15) — a second trusted grammar source</p>
+<p>  ratified by charter amendment A2, with <code>PROVENANCE.md</code> gaining a source column and a sha256</p>
+<p>  per wasm. The language count now propagates to every surface by NAME, gated by</p>
+<p>  <code>tests/lang-surfaces.test.mjs</code>, which encodes the live-versus-historical distinction so dated</p>
+<p>  records stay untouched.</p>
+<ul>
+<li><strong>The free-forever boundary and the Teams price intent are published.</strong> New site pages state</li>
+</ul>
+<p>  the ratified contract — anything that runs on one laptop against one repo is free forever;</p>
+<p>  money buys hosting, multi-repo aggregation, and human attention — alongside the hosted tier's</p>
+<p>  price intent (€10 per active author per month, active author = committed in the last 90 days,</p>
+<p>  flat and unlimited). Both pages ride every prose sweep via <code>PROSE_FILES</code>, and</p>
+<p>  <code>tests/boundary-pricing.test.mjs</code> pins the wording on both sides of the boundary.</p>
+<ul>
+<li><strong>Two launch pages that argue on re-derivable numbers.</strong> An LSP FAQ ("why not just an LSP")</li>
+</ul>
+<p>  and a comparison page, both first-class in the site's page table, the sitemap, and</p>
+<p>  <code>PROSE_FILES</code>, and both reachable by clicking from the homepage. Every number on them traces</p>
+<p>  to a committed receipt; the honesty ledger renders straight from <code>product.json</code>'s don't-claim</p>
+<p>  list, so a receipt re-run moves the page.</p>
+<ul>
+<li><strong>Three upgrade moments, and the zones that stay ask-free.</strong> The gate comment's footer carries</li>
+</ul>
+<p>  an org-dashboard line, the trend rail nudges at five or more snapshots in text mode only, and</p>
+<p>  the report footer keeps its attribution. The anti-placements are hard rules with tests: never</p>
+<p>  in an MCP tool response, never in a hook card, never on an error path, computed only from</p>
+<p>  local counters, one line, and suppressible via <code>CODEWEB_NO_PROMO=1</code>.</p>
+<h3 class="cl-grp">Changed</h3>
+<ul>
+<li><strong>The site and README lead with the deterministic regression gate.</strong> The gate is the story;</li>
+</ul>
+<p>  the map and graph support it. The ratified identity line is unchanged and still enforced</p>
+<p>  verbatim on all four surfaces.</p>
+<ul>
+<li><strong>The gate Action's examples pin a release tag, and gate adoption is observable.</strong> Copy-paste</li>
+</ul>
+<p>  surfaces name the shipped version instead of <code>@main</code> (the release roll now keeps them</p>
+<p>  current), and the weekly acquisition ledger reports the real status of its adoption search</p>
+<p>  instead of silently recording a null when the search cannot connect.</p>
+<h3 class="cl-grp">Fixed</h3>
+<ul>
+<li><strong>Four benchmark instruments repaired, so every number re-derives.</strong> <code>node bench/run-all.mjs</code></li>
+</ul>
+<p>  exits 0 again. Every failure was in the instrument, not the product, and all four reproduce at</p>
+<p>  pre-release HEAD: the correctness-query oracle dropped <code>ref</code> edges the shipped cycle walk has</p>
+<p>  always followed (all five families now measure 0 disagreements over 497,864 comparisons);</p>
+<p>  edit-safety imported a module deleted in July and crashed at import, taking six hypotheses</p>
+<p>  down with it; the auxiliary harness flagged the footer's hyperlink as a network fetch and</p>
+<p>  carried a stale tool-count table; and the performance harness tripped over a <code>/tmp</code> symlink.</p>
+<p>  No published number moved as a consequence of the repairs.</p>
+<ul>
+<li><strong>Release drift audit (<code>CLAUDE.md</code>, 150 · Drift Audit) — two claim-bearing corrections.</strong></li>
+</ul>
+<p>  <code>product.json</code>'s F10 "Sharded subgraphs" (mirrored to the product page) advertised a</p>
+<p>  capability whose implementation was deleted on 2026-07-19 by a measured decision recorded in</p>
+<p>  <code>bench/results/scale-typescript.json</code> → <code>previous.shardsDecision</code>: the monolithic graph loads</p>
+<p>  fast enough at 16k symbols, and the answer-preserving shard contract was never wired to a CLI</p>
+<p>  or MCP surface. The feature line is withdrawn rather than restored — the code is gone, and git</p>
+<p>  history holds it if a 100k-symbol case ever appears. This resolves charter row C9 the way C8</p>
+<p>  was resolved: claim-bearing copy does not ship a feature that does not exist. In the same</p>
+<p>  pass, the latency and scaling figures on the honesty ledger and the claim table were refreshed</p>
+<p>  from the regenerated <code>bench/results/performance.json</code> — they had been stale in the pessimistic</p>
+<p>  direction (worst-case p95 51.9 ms on 3,215 symbols, not 264 ms on 3,201).</p>
+<ul>
+<li><strong>The MCP registry manifest's description said 27 tools while 28 ship.</strong> <code>server.json</code>'s</li>
+</ul>
+<p>  description was the one tool-count surface no sweep read; it now self-heals through the</p>
+<p>  release roll like every other mirrored count.</p>
+<h2 class="cl-ver">[0.13.0] - 2026-08-17</h2>
 <h3 class="cl-grp">Added</h3>
 <ul>
 <li><strong>Evidence-backed README proof and acquisition visuals.</strong> A compact benchmark strip links its</li>
@@ -75,7 +259,152 @@
 <p>  parsed — no symbols, no grammar in the loop, determinism untouched — and an orphan json</p>
 <p>  file (nothing imports it) never becomes a node, so lock files add no noise. Scan-cache</p>
 <p>  format bumps to v18 (one cold re-extract per workspace on upgrade).</p>
+<h3 class="cl-grp">Added</h3>
+<ul>
+<li><strong>The after-edit gate loop is completable by any MCP client (AC-9).</strong> <code>codeweb_refresh</code></li>
+</ul>
+<p>  gains <code>snapshot:true</code> (also <code>refresh.mjs --snapshot</code>): the pre-refresh graph is preserved as</p>
+<p>  <code>graph.prev.json</code>, and <code>codeweb_diff</code>'s two arguments are now optional — <code>after</code> defaults to</p>
+<p>  the discovered graph and <code>before</code> defaults to that snapshot — so the prescribed</p>
+<p>  refresh-then-diff loop no longer needs the plugin's shell copy step. A missing snapshot gets</p>
+<p>  an actionable remedy naming the exact call.</p>
+<ul>
+<li><strong><code>codeweb_dependents</code> — the 28th tool (AC-10).</strong> The complete "who do I break?" union</li>
+</ul>
+<p>  (call + import + inherit + test + ref edges, tagged by kind) was CLI-only; it is now a</p>
+<p>  first-class MCP tool derived from the same manifest entry, budgeted with true totals, and</p>
+<p>  <code>codeweb_callers</code> points at it for the full-union question.</p>
+<ul>
+<li><strong>Staleness honesty reaches the advisors (AC-11).</strong> Every spawned graph-consuming reply now</li>
+</ul>
+<p>  carries the call-time staleness verdict (previously only the orient family was annotated —</p>
+<p>  <code>codeweb_simulate</code> could pre-flight a refactor from a week-old map with full confidence), and</p>
+<p>  the overlap-independent advisors (deadcode, risk, hotspots, break_cycles, reading_order,</p>
+<p>  simulate, placement, fitness) joined the auto-refresh set. Overlap-consuming advisors stay</p>
+<p>  out by design: refresh drops overlaps, so they get the annotation, never a silent refresh.</p>
+<ul>
+<li><strong>Agent-fallback maps carry their provenance (AC-12).</strong> The codebase-anatomy skill's</li>
+</ul>
+<p>  <code>meta.engine</code> stamp (hybrid | tools | read) is now read downstream: the briefing payload and</p>
+<p>  the session-start injection caveat agent-extracted maps as unverified, instead of answering</p>
+<p>  with deterministic-tier authority.</p>
+<h3 class="cl-grp">Changed</h3>
+<ul>
+<li><strong>Claim values now trace to receipts, mechanically.</strong> <code>check-consistency</code> gained</li>
+</ul>
+<p>  <code>auditClaimValues</code>: the published headline stats (the 74%/44% recall pair, the ~126×</p>
+<p>  impact-cost ratio, the "more than N comparisons" floor) are recomputed from their committed</p>
+<p>  receipt files and every surface restating a different value fails the build — closing the</p>
+<p>  drift class behind charter C6, where a re-run moved a receipt and every surface silently kept</p>
+<p>  the old number. Deliberately out of scope: the ±-form deltas (three legitimate values from</p>
+<p>  two receipts share one textual form). The requirements companion gained a one-way parity</p>
+<p>  check (a YAML-traced AC id must still exist in SPEC.md); the reverse — new ACs needing trace</p>
+<p>  records — is a re-baseline, which stays the operator's requirements process.</p>
+<ul>
+<li><strong>A weekly-vitals workflow is drafted</strong> (<code>weekly-vitals.yml</code>): the full gate, prove-red, and</li>
+</ul>
+<p>  the bench budget gate on a Monday schedule, so SPEC's kill-criteria tripwires can trip</p>
+<p>  between pushes (nothing executed for 18 days straight in August). Merging it is the</p>
+<p>  operator's adoption decision, recorded in the file header.</p>
+<ul>
+<li><strong>The evals floor grew from one product case to four</strong> (MCP initialize, tools/list carries</li>
+</ul>
+<p>  the new tool, query --help), release tooling gained CLI smoke tests (<code>version-sync</code> no-op on</p>
+<p>  an aligned repo; <code>screenshot</code> usage-not-stacktrace), <code>bench:all</code> now measures the tools/list</p>
+<p>  definitions surface (<code>toolsListBytes</code> — measured, not gated: the descriptions are P1's</p>
+<p>  experimental subject), <code>trend --json</code> emits one line (NDJSON-appendable), the impact answer</p>
+<p>  states its closure semantics (<code>call+inherit</code>; ref/import/test users via dependents), a dead</p>
+<p>  bench helper was removed, the graph schema's additive-only versioning stance is recorded in</p>
+<p>  the reference, and the extractor's cache-invariant map got its one page</p>
+<p>  (<code>docs/extractor-invariants.md</code>) — measurement over refactoring, per the hotspot ruling.</p>
+<ul>
+<li><strong>The distribution trigger's second arm is finally measurable.</strong> The weekly acquisition</li>
+</ul>
+<p>  ledger now records <code>gateReposExternal</code> (unique external repos referencing the gate Action in</p>
+<p>  a workflow file, via public GitHub code search — same no-telemetry ethics as every counter).</p>
+<p>  The parked Teams tier's own trigger ("&gt;10 external repos on the gate Action") could never be</p>
+<p>  observed firing before.</p>
+<ul>
+<li><strong>The gate Action is stranger-ready.</strong> <code>codeweb-ref</code> now really accepts a commit sha (clone</li>
+</ul>
+<p>  <code>--branch</code> fails on shas — branch/tag keep the shallow clone, shas fall back to</p>
+<p>  clone+checkout); a new <code>history</code> input persists a small cross-PR metrics ledger via the</p>
+<p>  Actions cache and renders the structural trend line in the sticky comment (previously the</p>
+<p>  trajectory feature was unreachable by adopters); the docs pin the action and <code>codeweb-ref</code></p>
+<p>  to release tags instead of <code>@main</code> and show the monorepo matrix pattern. The self-gate</p>
+<p>  dogfoods <code>history</code>.</p>
+<ul>
+<li><strong>The gate joined the product loop.</strong> A first map of a repo with <code>.github/</code> now prints a</li>
+</ul>
+<p>  fourth <code>next:</code> line pointing at the CI gate, and every report/demo footer carries a</p>
+<p>  "gate your PRs" link — the team-lead doorway existed only in docs before.</p>
+<ul>
+<li><strong>The Marketplace-publish step is gone (charter non-goal 6).</strong> Publishing auto-triggered</li>
+</ul>
+<p>  whenever a <code>VSCE_PAT</code> secret existed — a secret must not be able to override a standing</p>
+<p>  instruction. The <code>.vsix</code> still builds and attaches to every release; the removal is recorded</p>
+<p>  in place and pinned by the workflow test.</p>
+<ul>
+<li><strong>Grammar provenance is machine-verified.</strong> <code>PROVENANCE.md</code> records a sha256 per vendored</li>
+</ul>
+<p>  wasm and <code>tests/grammar-provenance.test.mjs</code> recomputes them (both directions: no digest-less</p>
+<p>  wasm, no phantom rows) plus the runtime-pin pairing; the refresh recipe now names the</p>
+<p>  <code>ts-engine.mjs</code> version stamp, and release prep inventories <code>@vscode/tree-sitter-wasm@latest</code></p>
+<p>  so the recorded Kotlin/Swift/C/C++ blockers resolve the moment upstream ships them.</p>
+<ul>
+<li><strong>The LSP question is answered on the deciding surfaces</strong> (product page + README): an LSP</li>
+</ul>
+<p>  answers one hop on demand in an editor session; codeweb builds one deterministic whole-graph</p>
+<p>  artifact agents query over MCP and CI diffs to gate a PR. Capability comparison only — no</p>
+<p>  invented numbers.</p>
+<ul>
+<li><strong>Non-Claude MCP clients get the full loop, documented.</strong> The start page now carries</li>
+</ul>
+<p>  per-client registration blocks (Cursor, Windsurf, Codex CLI, Gemini CLI, plugin-less Claude</p>
+<p>  Code) and a paste-ready rules snippet that teaches the before/after edit loop — the ambient</p>
+<p>  behavior the Claude plugin's hooks provide, for clients that surface neither hooks nor the</p>
+<p>  server's built-in instructions. The README names the loop's entry tools and links both.</p>
+<ul>
+<li><strong>D4 closed — the last Spring-Cleaning debt item.</strong> <code>codeweb_risk</code>'s ranking assembly moved</li>
+</ul>
+<p>  into <code>lib/risk.mjs</code> (<code>rankRisk</code> — one truth for the CLI and a future MCP fast path), and</p>
+<p>  <code>run.mjs</code>'s banner now reads optimize's <code>--json</code> totals instead of scraping its prose (a</p>
+<p>  wording tweak used to silently blank the ready/LOC fields; humans keep a rendered headline</p>
+<p>  and <code>CODEWEB_VERBOSE=1</code> shows the full advisory from <code>optimize.md</code>).</p>
+<ul>
+<li><strong>D1 residue closed.</strong> <code>reading-order</code>'s CLI budget default now derives from the tool</li>
+</ul>
+<p>  manifest via <code>budgetOf()</code> (the 40-vs-20 two-literal pair is gone — the manifest is the one</p>
+<p>  truth); <code>campaign</code>'s deliberate CLI/MCP budget divergence is documented at the site; and the</p>
+<p>  release gate now flags a <code>TOOL_BEHAVIOR</code> entry whose manifest spec was removed (dead</p>
+<p>  behavior — the reverse already threw at startup).</p>
+<ul>
+<li><strong>The post-edit hook warns once, on one channel.</strong> The structural warning rides the</li>
+</ul>
+<p>  structured <code>additionalContext</code> only; stderr is the fallback when that write fails — the same</p>
+<p>  warning used to arrive twice.</p>
+<ul>
+<li><strong>External-review verdicts now record the reviewed commit</strong> (<code>git rev-parse HEAD</code> of the</li>
+</ul>
+<p>  clone, first line of the verdict) — an adopt/avoid ruling without the commit it judged was a</p>
+<p>  claim without a source.</p>
 <h3 class="cl-grp">Fixed</h3>
+<ul>
+<li><strong>C7 truth sweep (2026-08-16 drift audit).</strong> The charter-ruled-fabricated sponsorship cost</li>
+</ul>
+<p>  premise still shipped through surfaces the claims gate never read: the report and demo footer</p>
+<p>  tooltips, <code>trend.mjs</code>'s five-snapshot rail, and the FUNDING.yml comment. All now carry the</p>
+<p>  ratified support framing, single-sourced from <code>product-copy.mjs</code> (<code>SPONSOR_LINE</code>), and the</p>
+<p>  gate closes the class — the cost-premise scan now sweeps every prose surface plus</p>
+<p>  FUNDING.yml, trend, and the gate comment; the generated artifacts (report template, live</p>
+<p>  demo) and the remaining site pages joined <code>PROSE_FILES</code>; and a numeric public claim hardcoded</p>
+<p>  in any script outside <code>product-copy.mjs</code> fails the build. Also corrected in the same sweep:</p>
+<p>  the README's 126× claim is attributed to the simulated grep loop its receipt actually</p>
+<p>  describes, the 74%/44% line carries its v0.9.0-pilot qualifier, the research page dates its</p>
+<p>  frozen receipts, the downloads page footer no longer claims "zero third-party requests" while</p>
+<p>  reading the public npm API, the README banner alt carries the ratified job line, and four</p>
+<p>  stale doc facts were fixed (two <code>cli.md</code> env rows, the <code>reference.md</code> extractor language</p>
+<p>  note, and the AST decision-record header).</p>
 <ul>
 <li>The social-preview source is now a center-safe 1280×640 JPEG. Important copy remains visible</li>
 </ul>
@@ -2166,7 +2495,7 @@
         <a class="brand" href="index.html">
           <span class="wm">code<span class="w">web</span></span>
         </a>
-        <p>A deterministic map of your codebase — one graph, read by humans and the agents editing alongside them.</p>
+        <p>Structural checks for AI code changes.</p>
       </div>
       <div class="footer-col">
         <h5>Product</h5>
@@ -2178,6 +2507,8 @@
       <div class="footer-col">
         <h5>Proof</h5>
         <a href="research.html">Research</a>
+        <a href="compare.html">Compare with grep</a>
+        <a href="lsp.html">Compare with LSP</a>
         <a href="https://github.com/GhostlyGawd/codeweb/tree/main/bench" rel="noopener">Benchmarks</a>
         <a href="https://github.com/GhostlyGawd/codeweb/tree/main/bench/results" rel="noopener">Raw results</a>
       </div>
@@ -2187,10 +2518,12 @@
         <a href="https://github.com/GhostlyGawd/codeweb/releases" rel="noopener">Releases</a>
         <a href="https://github.com/GhostlyGawd/codeweb/blob/main/LICENSE" rel="noopener">MIT License</a>
         <a href="support.html">Sponsor</a>
+        <a href="boundary.html">Free forever</a>
+        <a href="pricing.html">Teams pricing intent</a>
       </div>
     </div>
     <div class="footer-base">
-      <span>codeweb v0.12.0 · MIT · © 2026 <a href="https://github.com/GhostlyGawd">GhostlyGawd</a></span>
+      <span>codeweb v0.16.0 · MIT · © 2026 <a href="https://github.com/GhostlyGawd">GhostlyGawd</a></span>
       <span>Deterministic build · zero third-party requests on this page</span>
     </div>
   </div>

@@ -1,3 +1,4 @@
+import { incompleteAnalysis } from './analysis-completeness.mjs';
 // codeweb query core — the payload assembly behind query.mjs, extracted so the MCP server can
 // answer structural queries IN-PROCESS against a cached parsed graph (sub-ms after the first call)
 // while the CLI keeps shipping the exact same payloads (one truth, two transports).
@@ -63,6 +64,11 @@ export function runQuery(graph, index, opts) {
         if (uncovered.length) payload.summary += ` — ⚠ ${uncovered.length} of ${matched.length} matched symbol(s) NOT covered by the recorded run`;
       }
       if (query === 'callers' && !results.length) {
+        const references = refsOf(index, matched);
+        if (references.length) {
+          payload.referenceCount = references.length;
+          payload.summary += `; ${references.length} mapped reference user(s), available through codeweb_dependents`;
+        }
         const caveat = zeroCallerCaveat(graph, index, matched);
         if (caveat) { payload.caveat = caveat; payload.summary += ` — ⚠ ${caveat}`; }
       }
@@ -93,7 +99,9 @@ export function runQuery(graph, index, opts) {
       const ranked = limit != null
         ? results.slice().sort((a, b) => (index.callIn.get(b)?.size || 0) - (index.callIn.get(a)?.size || 0) || (a < b ? -1 : 1))
         : results;
-      payload = budget({ query: 'impact', symbol, summary: `editing ${symbol} touches ${results.length} function(s) across ${domains.length} domain(s)`, matched, results: ranked, domains, count: results.length }, 'results', limit, offset);
+      // The closure includes references so callback registration is visible in impact.
+      // Import/test-only users remain available through the dependents query.
+      payload = budget({ query: 'impact', symbol, summary: `editing ${symbol} has ${results.length} mapped consumer(s) across ${domains.length} domain(s)`, closure: 'transitive mapped consumers via call+inherit+ref edges; import/test users are listed by the dependents query; zero does not establish no runtime consumers', matched, results: ranked, domains, count: results.length }, 'results', limit, offset);
     }
   } else if (query === 'cycles') {
     const cycles = fileCycles(graph);
@@ -101,6 +109,12 @@ export function runQuery(graph, index, opts) {
   } else if (query === 'orphans') {
     const results = orphans(graph, index);
     payload = budget({ query: 'orphans', summary: `${results.length} orphan(s) — no callers and not exported`, results, count: results.length }, 'results', limit, offset);
+  }
+  const incomplete = incompleteAnalysis(graph);
+  if (incomplete && payload) {
+    payload.analysis = incomplete;
+    if (payload.summary) payload.summary += ' — analysis incomplete; mapped results only';
+    code = 2;
   }
   return { payload, code };
 }

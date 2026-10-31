@@ -10,10 +10,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { PLUGIN_ROOT, cleanup, tmpDir } from './helpers.mjs';
+import { PLUGIN_ROOT, cleanup, tmpDir, writeTree, fixtureGitIdentity } from './helpers.mjs';
 
 const pkg = JSON.parse(readFileSync(join(PLUGIN_ROOT, 'package.json'), 'utf8'));
 
@@ -30,7 +30,9 @@ test('P1: manifest is publishable — bins, files, no runtime deps, not private'
   // must point at a real path too — a negation for a ghost file is a manifest bug.
   for (const f of pkg.files || []) {
     const rel = f.startsWith('!') ? f.slice(1) : f;
-    assert.ok(existsSync(join(PLUGIN_ROOT, rel)), `files entry exists: ${f}`);
+    if (/[?*\[\]{}]/.test(rel)) {
+      assert.ok(f.startsWith('!'), 'glob exclusions are verified by the packed-artifact tests');
+    } else assert.ok(existsSync(join(PLUGIN_ROOT, rel)), `files entry exists: ${f}`);
   }
   assert.deepEqual(pkg.dependencies || {}, {}, 'zero runtime dependencies — the stance holds');
   assert.ok(pkg.optionalDependencies?.['web-tree-sitter'], 'the AST tier stays optional');
@@ -49,6 +51,7 @@ test('P2: npm pack ships engine + plugin surfaces, excludes repo-only trees', ()
   for (const banned of ['bench/', 'site/', 'docs/', 'tests/', 'assets/', 'spike/']) {
     assert.ok(!files.some((f) => f.startsWith(banned)), `tarball excludes ${banned}`);
   }
+  assert.ok(!files.some((f) => f.includes('/__pycache__/') || f.endsWith('.pyc')), 'compiled harness caches must not ship');
   // ADR-0001c: the harness layer is dev tooling — nothing shell/Python ships in the
   // "zero deps, runs 100% locally" package.
   for (const harness of ['scripts/check', 'scripts/spec_lint.py', 'scripts/hook-check', 'scripts/hook-protect']) {
@@ -116,8 +119,83 @@ test('P3: packed release installs offline and each installed bin answers --help'
         `${name} --help failed after offline installation\n${help.stderr}`,
       );
     }
+    const doctor = spawnSync(process.execPath, [join(prefix, 'node_modules', '@ghostlygawd', 'codeweb', 'bin', 'codeweb.mjs'), prefix, '--doctor', '--json'], {
+      ...spawnOptions, shell: false, cwd: prefix, env: { ...spawnOptions.env, CODEWEB_WS: '' },
+    });
+    assert.equal(doctor.status, 2, 'the installed doctor reports an unmapped target');
+    const localDiagnosis = JSON.parse(doctor.stdout);
+    assert.equal(localDiagnosis.installation.kind, 'packaged');
+    assert.equal(localDiagnosis.parsers.ast.ts, false, 'offline install omits optional AST runtime');
+    assert.equal(localDiagnosis.parsers.regex, true, 'zero-dependency fallback remains available');
+    // P3 exercises the shipped package entry, outside the checkout and without optional deps.
+    const project = join(prefix, 'fixture');
+    const body = 'export function compute(x) {\n let total = 0;\n for (let i = 0; i < x; i++) {\n  if (i % 2) total += i * 3;\n  else total -= i;\n }\n const scaled = total * 2 + 7;\n return scaled > 100 ? scaled - 100 : scaled;\n}\n';
+    writeTree(project, {'src/a.js': body, 'src/caller.js': 'import { compute } from "./a.js";\nexport function caller(x) { return compute(x); }\n'});
+    const bin = join(prefix, 'node_modules', '.bin', WIN ? 'codeweb.cmd' : 'codeweb');
+    const run = (...args) => spawnSync(bin, args, {...spawnOptions, cwd: project, env: {...spawnOptions.env, CODEWEB_WS: ''}});
+    for (const client of ['claude','cursor','windsurf','gemini','codex']) {
+      const result = run('setup','--client',client,'--json');
+      assert.equal(result.status,0,result.stderr);
+      const setup = JSON.parse(result.stdout);
+      assert.equal(setup.recipe.id,client); assert.equal(setup.written,false);
+    }
+    const mapped = run('src','--out-dir','.codeweb','--json');
+    assert.equal(mapped.status,0,mapped.stderr);
+    const diagnosis = run('doctor','--json');
+    assert.equal(diagnosis.status,0,diagnosis.stdout + diagnosis.stderr);
+    const health = JSON.parse(diagnosis.stdout);
+    assert.equal(health.ok,true); assert.equal(health.editorConnection,'unverified');
+    assert.equal(health.checks.find(check => check.name === 'server').status,'pass');
+    const graph = join(project,'.codeweb','graph.json');
+    const before = join(project,'before.json');
+    writeFileSync(before,readFileSync(graph));
+    const html = join(project,'review.html');
+    const review = run('review',graph,'--changed','a.js','--before',before,'--json','--html',html);
+    assert.equal(review.status,0,review.stderr);
+    const summary = JSON.parse(review.stdout);
+    assert.equal(summary.analysis.status,'complete');
+    assert.match(JSON.stringify(summary.review),/caller/);
+    assert.match(readFileSync(html,'utf8'),/Changed symbols/);
+    assert.match(readFileSync(html,'utf8'),/Affected callers/);
+    if (spawnSync('git',['--version']).status === 0) {
+      const git = (...args) => { const r = spawnSync('git',['-C',project,...args],{encoding:'utf8'}); assert.equal(r.status,0,r.stderr); return r.stdout.trim(); };
+      git('init','-q'); const identity = fixtureGitIdentity();
+      git('config','user.name',identity.name); git('config','user.email',identity.email); git('config','commit.gpgsign','false');
+      git('add','src'); git('commit','-qm','base'); const base = git('rev-parse','HEAD');
+      writeTree(project,{'src/b.js':body});
+      const blocking = run('gate','--base',base,'--target','src');
+      assert.equal(blocking.status,1,blocking.stdout + blocking.stderr);
+      const advisory = run('gate','--base',base,'--target','src','--report-only');
+      assert.equal(advisory.status,0,advisory.stdout + advisory.stderr);
+      assert.match(advisory.stdout,/regression type/);
+      const broken = run('gate','--base','missing-ref','--target','src','--report-only');
+      assert.equal(broken.status,2,broken.stdout + broken.stderr);
+    }
   } finally {
     cleanup(packDir);
     cleanup(prefix);
   }
+});
+
+
+test('P4: package exclusions reject generated Python bytecode even when caches exist', () => {
+  const dir = tmpDir('cw-pack-caches-');
+  const WIN = process.platform === 'win32';
+  try {
+    writeTree(dir, {
+      'package.json': JSON.stringify({ name: 'codeweb-package-fixture', version: '0.0.0', files: pkg.files }),
+      'scripts/engine.mjs': 'export const runtime = true;\n',
+      'scripts/__pycache__/spec_lint.cpython-314.pyc': 'compiled harness sentinel',
+      'scripts/nested/__pycache__/helper.pyc': 'nested compiled sentinel',
+      'scripts/loose.pyc': 'loose compiled sentinel',
+    });
+    const r = spawnSync(WIN ? 'npm.cmd' : 'npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+      cwd: dir, encoding: 'utf8', shell: WIN, maxBuffer: 1 << 26,
+      env: { ...process.env, npm_config_cache: join(dir, 'npm-cache'), npm_config_audit: 'false', npm_config_fund: 'false' },
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const files = JSON.parse(r.stdout)[0].files.map((f) => f.path);
+    assert.ok(files.includes('scripts/engine.mjs'), 'runtime control stays packaged');
+    assert.ok(!files.some((f) => f.includes('/__pycache__/') || f.endsWith('.pyc')), files.join('\n'));
+  } finally { cleanup(dir); }
 });

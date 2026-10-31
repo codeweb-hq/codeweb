@@ -3,7 +3,7 @@ name: codebase-anatomy
 description: Dissect a codebase to atomic nodes (functions, classes, symbols), wire the call/import web, tag each node's domain, and build a cross-domain overlap graph that ranks consolidation/de-duplication opportunities, then render an interactive HTML map. Use to restructure your own codebase into well-defined non-duplicative systems, OR to fully map and review an external repo (git URL / owner-repo) before adopting it. Triggers include "map this codebase", "dependency/relationship graph", "find duplication/overlap", "atomic dissection", "review this repo before I use it", and the /codeweb command.
 metadata:
   origin: community
-  version: 0.12.0
+  version: 0.16.0
 ---
 
 # Codebase Anatomy (codeweb)
@@ -82,11 +82,14 @@ Auto-detect: a URL or `owner/repo` ⇒ external; a path or `.` ⇒ internal. `--
   dir (e.g. `${TMPDIR}/codeweb-<repo>`); **do not** run anything inside it.
 - Detect languages, package managers, and repo size (`rg --files | wc -l`). Choose effective
   depth: `auto` ⇒ module-level overview, then symbol-level on the densest/most-overlapping
-  subsystems. Probe for analysis tools per `engine-detection.md`; record the engine.
+  subsystems. Probe for analysis tools per `engine-detection.md`; record the engine — the
+  `meta.engine` value (hybrid | tools | read) is the map's provenance label: downstream
+  surfaces (codeweb_brief, the session brief) caveat agent-built maps as unverified, so
+  always stamp it (AC-12).
 
 ### Fast path (default) — one-command deterministic engine
 
-For languages the bundled extractor handles (**JavaScript, TypeScript, Python, Rust, Go, Java, C#, Ruby, PHP, Kotlin, Swift**), run the whole
+For languages the bundled extractor handles (**JavaScript, TypeScript, Python, Rust, Go, Java, C#, Ruby, PHP, Kotlin, Swift, C, C++**), run the whole
 pipeline in a single command instead of dissecting by hand. It is faster, cheaper, and
 reproducible, and emits the same `graph.json` schema:
 
@@ -158,7 +161,11 @@ needs more evidence.
 Append an adoption verdict: what the repo is and does (from the domain map), notable
 dependencies and risk surface (lean on `security-review` / `repo-scan` signals), architecture
 quality (cohesion vs the overlap graph), and a clear **adopt / adapt / avoid** recommendation
-with reasons. Then clean up the temp clone.
+with reasons.
+
+**Record the reviewed commit**: run `git rev-parse HEAD` in the clone and put the SHA in the
+verdict's first line — a ruling without the commit it judged is a claim without a source.
+Then clean up the temp clone.
 
 ## Scaling
 

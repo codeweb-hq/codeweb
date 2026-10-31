@@ -34,13 +34,13 @@ test('--out redirects the whole build', () => {
 test('builder runs and reports the expected page count', () => {
   const r = runNode(BUILD, ['--out', OUT]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /built 8 page\(s\)/); // +case-study (SEO F8) +support (REVENUE §4.3) +downloads (operator, unlisted)
+  assert.match(r.stdout, /built 12 page\(s\)/); // +case-study (SEO F8) +support (REVENUE §4.3) +downloads (operator, unlisted) +boundary/pricing (CHARTER, the boundary) +lsp/compare (COMPETITIVE §3.2 stake #2, §4 Bet 1)
 });
 
 test('emits every page in the information architecture', () => {
   runNode(BUILD, ['--out', OUT]);
   const files = htmlFiles();
-  for (const p of ['index.html', 'product.html', 'research.html', 'start.html', 'changelog.html', 'case-study.html', 'support.html']) {
+  for (const p of ['index.html', 'product.html', 'research.html', 'start.html', 'changelog.html', 'case-study.html', 'support.html', 'boundary.html', 'pricing.html']) {
     assert.ok(files.includes(p), `missing ${p}`);
   }
 });
@@ -108,7 +108,7 @@ test('pages are self-contained — no third-party network origins', () => {
     // property this test protects is about network REQUESTS (scripts, styles, images, fonts).
     const externals = (html.match(/https?:\/\/[^\s"')]+/g) || [])
       .filter((u) => !u.startsWith('https://github.com/'))
-      .filter((u) => !u.startsWith('https://ghostlygawd.github.io/'))
+      .filter((u) => !u.startsWith('https://codeweb-hq.github.io/'))
       .filter((u) => !u.startsWith('https://keepachangelog.com/'))
       .filter((u) => !u.startsWith('https://semver.org/'))
       .filter((u) => !u.startsWith('http://www.w3.org/'))
