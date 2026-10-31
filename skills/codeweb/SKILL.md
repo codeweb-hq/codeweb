@@ -3,7 +3,7 @@ name: codeweb
 description: Inspect mapped callers and impact before changing code, find existing implementations before adding one, and review structural changes after an edit. Use during coding tasks; Codeweb product planning uses a separate workflow.
 metadata:
   origin: community
-  version: 0.16.0
+  version: 0.16.1
 ---
 
 # Codeweb

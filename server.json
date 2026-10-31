@@ -7,14 +7,14 @@
     "url": "https://github.com/codeweb-hq/codeweb",
     "source": "github"
   },
-  "version": "0.16.0",
+  "version": "0.16.1",
   "websiteUrl": "https://codeweb-hq.github.io/codeweb/",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@ghostlygawd/codeweb",
-      "version": "0.16.0",
+      "version": "0.16.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
