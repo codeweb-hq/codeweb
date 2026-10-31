@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   browser-verification:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright 1.55 does not support ubuntu-latest (26.04); unpin when Playwright is bumped
     timeout-minutes: 20
     env:
       CODEWEB_NO_STATS: '1'
