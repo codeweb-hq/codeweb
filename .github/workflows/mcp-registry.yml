@@ -33,6 +33,16 @@ jobs:
           done
           test -x mcp-publisher
           ./mcp-publisher --version
+      - name: Wait for the npm version to be visible
+        # The registry validates the npm package before accepting server.json. Right after a release
+        # npm can answer 404 for the new version for a minute or two (the 2026-10-02 run failed on this).
+        run: |
+          V="$(jq -r .version server.json)"; N="$(jq -r '.packages[0].identifier' server.json)"
+          for _ in $(seq 30); do
+            npm view "$N@$V" version >/dev/null 2>&1 && { echo "$N@$V is visible on npm"; exit 0; }
+            sleep 20
+          done
+          echo "::error::$N@$V not visible on npm after 10 minutes"; exit 1
       - name: Login (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
       - name: Publish server.json
