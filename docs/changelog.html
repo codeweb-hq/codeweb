@@ -57,7 +57,10 @@
       <div class="btn-row"><a class="btn" href="https://github.com/GhostlyGawd/codeweb/releases" rel="noopener">GitHub releases</a><a class="btn" href="https://github.com/GhostlyGawd/codeweb/blob/main/CHANGELOG.md" rel="noopener">CHANGELOG.md</a></div>
     </div>
     <div class="prose changelog"><h2 class="cl-ver">[Unreleased]</h2>
-<p>Nothing yet. Open work lands here before it ships in the next tagged release.</p>
+<h3 class="cl-grp">Fixed</h3>
+<ul>
+<li>Map Python <code>async def</code> functions and methods. The symbol rule only matched <code>def</code>, so no async function became a node and calls into one were dropped or wired to a same-named function elsewhere (issue #104). <code>SCANNER_VERSION</code> is now 25, so existing caches rebuild.</li>
+</ul>
 <h2 class="cl-ver">[0.16.0] - 2026-10-02</h2>
 <h3 class="cl-grp">Fixed</h3>
 <ul>
