@@ -83,8 +83,8 @@ site straight from `site/data/product.json` so it cannot drift out of sync with 
 MIT, zero required dependencies, Node >= 22. Runs entirely on your machine: no account, no
 telemetry, no license keys, and it reads code without executing it.
 
-- Site: https://ghostlygawd.github.io/codeweb/
-- The evidence: https://ghostlygawd.github.io/codeweb/research.html
+- Site: https://codeweb-hq.github.io/codeweb/
+- The evidence: https://codeweb-hq.github.io/codeweb/research.html
 - Release: https://github.com/GhostlyGawd/codeweb/releases/tag/v0.14.0
 
 If a number in here does not re-derive on your machine, that is a bug worth an issue.

@@ -288,7 +288,7 @@ const JSONLD = JSON.stringify({
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   license: 'https://opensource.org/licenses/MIT',
   codeRepository: 'https://github.com/GhostlyGawd/codeweb',
-  url: 'https://ghostlygawd.github.io/codeweb/',
+  url: 'https://codeweb-hq.github.io/codeweb/',
   sameAs: ['https://github.com/GhostlyGawd/codeweb', 'https://www.npmjs.com/package/@ghostlygawd/codeweb'],
 });
 

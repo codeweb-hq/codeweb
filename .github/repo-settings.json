@@ -1,6 +1,6 @@
 {
   "description": "See what your AI edits affect. Structural checks for AI code changes. Local call/import graphs and 28 MCP tools for impact, callers, and duplication. No LLM in the checks.",
-  "homepage": "https://ghostlygawd.github.io/codeweb/",
+  "homepage": "https://codeweb-hq.github.io/codeweb/",
   "topics": [
     "mcp",
     "mcp-server",

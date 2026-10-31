@@ -2,7 +2,7 @@
   "name": "codeweb",
   "tagline": "See what your AI edits affect.",
   "repo": "https://github.com/GhostlyGawd/codeweb",
-  "pagesBase": "https://ghostlygawd.github.io/codeweb/",
+  "pagesBase": "https://codeweb-hq.github.io/codeweb/",
   "elevator": "See what your AI edits affect. Structural checks for AI code changes. Trace callers before an edit. Check changes for new dependency cycles, body-confirmed duplication, and lost callers. Local static analysis supplies 28 MCP tools and a supporting report. No LLM in the checks. A passing result does not prove the program works.",
   "philosophy": [
     "Deterministic — no LLM in the analysis loop; the same repo always yields the same graph.",

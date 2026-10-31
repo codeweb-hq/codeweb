@@ -16,7 +16,7 @@ Show HN: Codeweb – I pre-registered 32 checks against independent oracles
 ## URL
 
 ```
-https://ghostlygawd.github.io/codeweb/research.html
+https://codeweb-hq.github.io/codeweb/research.html
 ```
 
 The research page is the landing rather than the homepage: it opens with the pre-registration

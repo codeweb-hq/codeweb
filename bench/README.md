@@ -2,7 +2,7 @@
 
 Every public claim codeweb makes traces to a file in this directory. It holds the **runnable
 instruments** (harnesses that measure the engine and the agent loop) and the **frozen results**
-they produced — the receipts behind the site's [evidence ledger](https://ghostlygawd.github.io/codeweb/research.html)
+they produced — the receipts behind the site's [evidence ledger](https://codeweb-hq.github.io/codeweb/research.html)
 and the README's numbers.
 
 ## Layout

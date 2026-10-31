@@ -163,7 +163,7 @@ test('F6d: the Search Console ownership proof rides the shared head — dropping
 test('F1b: repo About settings are code — the workflow applies what the JSON declares', () => {
   const cfg = readJSON(join(PLUGIN_ROOT, '.github', 'repo-settings.json'));
   assert.match(cfg.description, /call\/import graph/, 'description carries the CRO wording');
-  assert.equal(cfg.homepage, 'https://ghostlygawd.github.io/codeweb/');
+  assert.equal(cfg.homepage, 'https://codeweb-hq.github.io/codeweb/');
   assert.ok(cfg.topics.includes('mcp-server') && cfg.topics.length >= 10, 'the SEO topic set rides along');
   assert.ok(cfg.topics.every((t) => /^[a-z0-9-]+$/.test(t)), 'every topic is GitHub-valid (lowercase, hyphens)');
   const wf = read('.github/workflows/repo-settings.yml');

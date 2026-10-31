@@ -8,7 +8,7 @@
     "source": "github"
   },
   "version": "0.16.0",
-  "websiteUrl": "https://ghostlygawd.github.io/codeweb/",
+  "websiteUrl": "https://codeweb-hq.github.io/codeweb/",
   "packages": [
     {
       "registryType": "npm",

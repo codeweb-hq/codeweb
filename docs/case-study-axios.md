@@ -8,7 +8,7 @@ approximately 50 million times each week. codeweb read the source, built the gra
 the report with one command. codeweb did not execute the target code.
 
 > **▶ Explore the result yourself:** the interactive map below is the unedited generated report —
-> [open the live demo](https://ghostlygawd.github.io/codeweb/demo/). *(Published from
+> [open the live demo](https://codeweb-hq.github.io/codeweb/demo/). *(Published from
 > [`docs/demo/index.html`](demo/index.html).)*
 
 ![codeweb's domain view of axios — eight auto-detected areas (adapters, helpers, core, cancel, defaults, platform) sized by symbol count and linked by their call/import coupling](../assets/screens/05-axios-graph.png)

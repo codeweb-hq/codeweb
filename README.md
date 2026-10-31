@@ -8,10 +8,10 @@
 
 **Free & MIT-licensed. Runs entirely on your machine — no account, no server, no telemetry. Reads your code; never executes it.**
 
-**[Website](https://ghostlygawd.github.io/codeweb/)**&nbsp;·&nbsp;[Gate every PR](#gate-every-pull-request)&nbsp;·&nbsp;[See it in action](#see-it-in-action)&nbsp;·&nbsp;[Install](#install)&nbsp;·&nbsp;[Use](#use)&nbsp;·&nbsp;[For agents (MCP: Model Context Protocol)](#use-it-as-an-mcp-tool)&nbsp;·&nbsp;[How it works](#how-it-works)&nbsp;·&nbsp;[Free forever](#free-forever-and-where-the-paid-line-sits)&nbsp;·&nbsp;[Changelog](CHANGELOG.md)
+**[Website](https://codeweb-hq.github.io/codeweb/)**&nbsp;·&nbsp;[Gate every PR](#gate-every-pull-request)&nbsp;·&nbsp;[See it in action](#see-it-in-action)&nbsp;·&nbsp;[Install](#install)&nbsp;·&nbsp;[Use](#use)&nbsp;·&nbsp;[For agents (MCP: Model Context Protocol)](#use-it-as-an-mcp-tool)&nbsp;·&nbsp;[How it works](#how-it-works)&nbsp;·&nbsp;[Free forever](#free-forever-and-where-the-paid-line-sits)&nbsp;·&nbsp;[Changelog](CHANGELOG.md)
 
 [![Try it with npx](https://img.shields.io/badge/Try_it_with_npx-060608?style=for-the-badge&logo=npm&logoColor=c6f24e)](#try-it-on-your-repo)
-[![Open the live demo](https://img.shields.io/badge/Open_the_live_demo-060608?style=for-the-badge&logoColor=c6f24e)](https://ghostlygawd.github.io/codeweb/demo/)
+[![Open the live demo](https://img.shields.io/badge/Open_the_live_demo-060608?style=for-the-badge&logoColor=c6f24e)](https://codeweb-hq.github.io/codeweb/demo/)
 [![Install the Claude Code plugin](https://img.shields.io/badge/Install_the_Claude_Code_plugin-060608?style=for-the-badge&logoColor=c6f24e)](#install)
 
 </div>
@@ -23,7 +23,7 @@ npx -y @ghostlygawd/codeweb .
 ```
 
 <div align="center">
-<a href="https://ghostlygawd.github.io/codeweb/downloads.html"><img src="assets/metrics/npm-downloads.svg" alt="Latest seven-day npm download total with a line chart of completed daily downloads for @ghostlygawd/codeweb, generated from the public npm downloads API" width="100%"></a>
+<a href="https://codeweb-hq.github.io/codeweb/downloads.html"><img src="assets/metrics/npm-downloads.svg" alt="Latest seven-day npm download total with a line chart of completed daily downloads for @ghostlygawd/codeweb, generated from the public npm downloads API" width="100%"></a>
 <br><sub>The large number is the latest seven completed days; the line shows daily downloads. Package downloads are retrievals, not a count of users. Select the chart for the live data and reporting cutoff.</sub>
 </div>
 
@@ -55,7 +55,7 @@ ambiguous calls, and runtime dispatch; the map is not a completeness guarantee.
 
 Your coding agents query the map instead of using grep. In measured tests, agents that used grep
 missed more than half of a function's real callers
-([see the measurements](https://ghostlygawd.github.io/codeweb/research.html)). An incomplete caller
+([see the measurements](https://codeweb-hq.github.io/codeweb/research.html)). An incomplete caller
 list can cause an agent to break code that it did not inspect.
 
 - **Give agents structural data:** The Model Context Protocol (MCP) server provides 28 tools,
@@ -68,7 +68,7 @@ The map also shows relationships that are not visible in one file. These relatio
 **duplicated logic, dead code, hotspots, and tangled domains**.
 
 <div align="center">
-<a href="https://ghostlygawd.github.io/codeweb/research.html"><img src="assets/brand/proof-strip.svg" alt="Measured codeweb results: agents found 74% of real callers with codeweb and 44% with grep at the same context spend; impact answers had 126 times smaller context size than a simulated graph-assisted grep loop; more than 490,000 deterministic comparisons had zero disagreements" width="100%"></a>
+<a href="https://codeweb-hq.github.io/codeweb/research.html"><img src="assets/brand/proof-strip.svg" alt="Measured codeweb results: agents found 74% of real callers with codeweb and 44% with grep at the same context spend; impact answers had 126 times smaller context size than a simulated graph-assisted grep loop; more than 490,000 deterministic comparisons had zero disagreements" width="100%"></a>
 <br><sub>Measured against fixed tasks and independent oracles. Select the proof strip for the methodology and receipts.</sub>
 </div>
 
@@ -107,7 +107,7 @@ workflow YAML, the monorepo matrix form, and every input live in
 [`docs/ci-gate.md`](docs/ci-gate.md).
 
 Want the gate hosted — no workflow YAML, cached base graphs, and history across every repo in the
-org? That is the planned scope of [codeweb Teams](https://ghostlygawd.github.io/codeweb/pricing.html), the paid half of
+org? That is the planned scope of [codeweb Teams](https://codeweb-hq.github.io/codeweb/pricing.html), the paid half of
 [the boundary](#free-forever-and-where-the-paid-line-sits). Running it yourself stays free forever.
 
 ## See it in action
@@ -117,18 +117,18 @@ The screenshots are not mockups.
 
 codeweb found 3 real duplications in axios and rejected 12 false positives. Read
 [the case study](docs/case-study-axios.md), or
-[inspect the live map](https://ghostlygawd.github.io/codeweb/demo/).
+[inspect the live map](https://codeweb-hq.github.io/codeweb/demo/).
 
 ### Know what an edit breaks — before you write
 
-Select a function in the [live map](https://ghostlygawd.github.io/codeweb/). The map highlights
+Select a function in the [live map](https://codeweb-hq.github.io/codeweb/). The map highlights
 the function's **blast radius** and shows the symbols that the change can affect.
 
 Your agents can get the same answer from the `codeweb_impact` MCP tool before they edit the code.
 
 <div align="center">
 <img src="assets/screens/axios-blast-radius.png" alt="codeweb blast radius: AxiosError selected in the axios graph, with its mapped users highlighted in the inspector" width="760">
-<br><sub><code>AxiosError</code> has <b>20 callers across the domains that depend on it</b>; reference and import users are separate mapped relationships. Explore them in the <a href="https://ghostlygawd.github.io/codeweb/">living map</a>.</sub>
+<br><sub><code>AxiosError</code> has <b>20 callers across the domains that depend on it</b>; reference and import users are separate mapped relationships. Explore them in the <a href="https://codeweb-hq.github.io/codeweb/">living map</a>.</sub>
 </div>
 
 ### Navigate the whole system
@@ -193,7 +193,7 @@ a merge.
   completed simple tasks successfully without codeweb.
 
 Methodology, raw data, and per-claim receipts:
-[the evidence ledger](https://ghostlygawd.github.io/codeweb/research.html). Benchmark your own
+[the evidence ledger](https://codeweb-hq.github.io/codeweb/research.html). Benchmark your own
 repo from a Codeweb source checkout: `npm run bench -- <path>/.codeweb/graph.json`. CI re-runs the performance budgets on
 every PR; breaking a published number fails the build.
 
@@ -238,7 +238,7 @@ The plugin/MCP workflow is verified with Codex CLI 0.159.2 and 0.160.0. If a cli
 bundled tools, use the standalone MCP recipe below with the coding skill. Manage each configured
 entry when disabling or removing Codeweb. This workflow does not claim automatic hook delivery.
 
-**Choose your MCP client:** [The setup page](https://ghostlygawd.github.io/codeweb/start.html#other-clients)
+**Choose your MCP client:** [The setup page](https://codeweb-hq.github.io/codeweb/start.html#other-clients)
 provides one recipe for Claude Code, Cursor, Windsurf, Gemini CLI, or Codex. Print a recipe
 and check local setup from your project:
 
@@ -346,10 +346,10 @@ this loop does not evaluate duplication; structural green does not prove behavio
 correctness. Run the project's tests too. If the baseline is missing, edited source cannot
 reconstruct it — recover the pre-edit source before beginning again.
 
-For npm v0.14.0, use the [snapshot quickstart](https://ghostlygawd.github.io/codeweb/start.html#npm-quickstart).
-For the unreleased checkout, try the [tiny cycle → repair → green walkthrough](https://ghostlygawd.github.io/codeweb/start.html#cycle-walkthrough).
+For npm v0.14.0, use the [snapshot quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart).
+For the unreleased checkout, try the [tiny cycle → repair → green walkthrough](https://codeweb-hq.github.io/codeweb/start.html#cycle-walkthrough).
 Clients that hide the server's built-in instructions can paste
-[the rules snippet](https://ghostlygawd.github.io/codeweb/start.html#rules-snippet) instead.
+[the rules snippet](https://codeweb-hq.github.io/codeweb/start.html#rules-snippet) instead.
 
 The server includes these agent-specific features:
 
@@ -418,7 +418,7 @@ repository ownership. [The component map](docs/reference.md#components) details 
 
 _Recent releases added the agent-intelligence suite (**hotspots**, **campaign**,
 **reading-order**, Type-2 clone detection, and suppression memory), a
-**[live interactive demo](https://ghostlygawd.github.io/codeweb/demo/)**, Go and Rust on the fast
+**[live interactive demo](https://codeweb-hq.github.io/codeweb/demo/)**, Go and Rust on the fast
 path, duplication trend data, and the one-command CI regression gate with a GitHub Action.
 codeweb currently provides 28 tools._
 
@@ -472,15 +472,15 @@ Hosted availability is not established by this repository’s local checks. The 
 retains the sign-up doorway.
 
 Read the full contract on
-[the boundary page](https://ghostlygawd.github.io/codeweb/boundary.html), and the planned Teams
-price on [the pricing page](https://ghostlygawd.github.io/codeweb/pricing.html).
+[the boundary page](https://codeweb-hq.github.io/codeweb/boundary.html), and the planned Teams
+price on [the pricing page](https://codeweb-hq.github.io/codeweb/pricing.html).
 
 ## Support the project
 
 [Sponsoring](https://github.com/sponsors/GhostlyGawd) supports the project. Sponsorship also
 provides advertising. Top sponsors can put their logo at the top of this README, and each sponsor
 can join the supporters list. See the
-[support page](https://ghostlygawd.github.io/codeweb/support.html) for details.
+[support page](https://codeweb-hq.github.io/codeweb/support.html) for details.
 
 Running codeweb at an organization and need help? Send email through the GitHub profile.
 

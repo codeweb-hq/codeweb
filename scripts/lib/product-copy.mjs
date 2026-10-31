@@ -21,7 +21,7 @@ export const SPONSOR_ASK = '[run]   ' + SPONSOR_LINE;
 // error path. tests/upgrade-placements.test.mjs sweeps the shipped scripts to keep it that way.
 
 /** Where every upgrade moment points: the Teams surface on the site. */
-export const TEAMS_URL = 'https://ghostlygawd.github.io/codeweb/pricing.html';
+export const TEAMS_URL = 'https://codeweb-hq.github.io/codeweb/pricing.html';
 
 /** The lever that silences every upgrade moment, named beside the other knobs in docs/cli.md. */
 export const NO_PROMO_ENV = 'CODEWEB_NO_PROMO';

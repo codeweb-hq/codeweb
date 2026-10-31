@@ -108,7 +108,7 @@ test('pages are self-contained — no third-party network origins', () => {
     // property this test protects is about network REQUESTS (scripts, styles, images, fonts).
     const externals = (html.match(/https?:\/\/[^\s"')]+/g) || [])
       .filter((u) => !u.startsWith('https://github.com/'))
-      .filter((u) => !u.startsWith('https://ghostlygawd.github.io/'))
+      .filter((u) => !u.startsWith('https://codeweb-hq.github.io/'))
       .filter((u) => !u.startsWith('https://keepachangelog.com/'))
       .filter((u) => !u.startsWith('https://semver.org/'))
       .filter((u) => !u.startsWith('http://www.w3.org/'))

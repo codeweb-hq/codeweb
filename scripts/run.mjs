@@ -367,18 +367,18 @@ if (opts.json) {
       // First use leads with the agent's edit/check loop; the map supports it.
       const openCmd = process.platform === 'win32' ? 'start ""' : process.platform === 'darwin' ? 'open' : 'xdg-open';
       console.log(`[run] next:`);
-      console.log(`[run]   1. connect your agent: claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp (other clients: https://ghostlygawd.github.io/codeweb/start.html#other-clients)`);
+      console.log(`[run]   1. connect your agent: claude mcp add codeweb -- npx -y -p @ghostlygawd/codeweb codeweb-mcp (other clients: https://codeweb-hq.github.io/codeweb/start.html#other-clients)`);
       console.log(`[run]   2. BEFORE edits: codeweb_refresh {baseline:true}, then codeweb_explain / codeweb_dependents for the symbol`);
       console.log(`[run]   3. AFTER edits: codeweb_diff {before:"baseline",refresh:true}; repair and re-run this diff against the same baseline — do not capture another baseline during repair`);
       console.log(`[run]      Read analysis.checks for skipped checks; green structure does not prove behavior. Run your product tests.`);
-      console.log(`[run]      Try the cycle walkthrough: https://ghostlygawd.github.io/codeweb/start.html#cycle-walkthrough`);
+      console.log(`[run]      Try the cycle walkthrough: https://codeweb-hq.github.io/codeweb/start.html#cycle-walkthrough`);
       console.log(`[run]      Supporting view: ${opts.open ? 'the map is opening in your browser' : `see the map: ${openCmd} ${join(ws, 'report.html')}`}`);
       // GRW-F4: the CI gate is the team-lead doorway (and the one surface with a distribution
       // trigger defined on it), yet no in-product moment ever said it exists. Say it exactly
       // where an activated user with a CI setup is already looking.
       try {
         if (existsSync(join(resolve(opts.src), '.github'))) {
-          console.log(`[run]   4. gate your PRs on this structure: https://ghostlygawd.github.io/codeweb/product.html#ci-gate`);
+          console.log(`[run]   4. gate your PRs on this structure: https://codeweb-hq.github.io/codeweb/product.html#ci-gate`);
         }
       } catch { /* the nudge must never break the pipeline */ }
     }

@@ -7,7 +7,7 @@ For reading paths and file ownership, start with the [documentation index](READM
 
 Examples using `node scripts/...` run from a Codeweb source checkout; `<graph.json>`
 is a placeholder for your target’s graph path. npm users can follow the
-[runnable snapshot quickstart](https://ghostlygawd.github.io/codeweb/start.html#npm-quickstart)
+[runnable snapshot quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart)
 using shipped bins from their own repository.
 
 - [Outputs](#outputs-under-targetcodeweb)
@@ -85,7 +85,7 @@ See [the gate contract](ci-gate.md).
 
 For the installed-binary snapshot workflow, copy the full map to `before.json` **before** editing. Rebuild the full
 map after each edit or repair and compare it with that same saved file. Keep the baseline
-outside the regenerated workspace; the [quickstart](https://ghostlygawd.github.io/codeweb/start.html#npm-quickstart) supplies every command.
+outside the regenerated workspace; the [quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart) supplies every command.
 
 **Codeweb 0.15.0 and later:** follow [the explicit-baseline workflow](cli.md#before-and-after-an-edit):
 `codeweb_refresh {baseline:true}` before editing, then

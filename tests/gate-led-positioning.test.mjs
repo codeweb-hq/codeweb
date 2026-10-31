@@ -18,7 +18,7 @@ const IDENTITY = 'See what your AI edits affect.';
 // The mission's ratified positioning line. Case-insensitive: the site sets it in caps via CSS,
 // the README writes it in sentence case.
 const GATE_LEAD = /Structural checks for AI code changes/i;
-const BOUNDARY_URL = 'https://ghostlygawd.github.io/codeweb/boundary.html';
+const BOUNDARY_URL = 'https://codeweb-hq.github.io/codeweb/boundary.html';
 
 /** Index of a marker, asserting presence first so a failure names what is missing. */
 function at(text, marker, where) {

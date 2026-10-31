@@ -100,7 +100,7 @@ possible from either side until a maintainer unarchives it. The prepared line, f
 their `Development Tools` section, is kept here so it can be reused:
 
 ```markdown
-- <img src="https://ghostlygawd.github.io/codeweb/assets/favicon.svg" height="14" /> [GhostlyGawd/codeweb](https://github.com/GhostlyGawd/codeweb) - Deterministic call/import graph over a repository, exposed as 28 tools for impact, callers, duplication, dead code, and hotspots across 13 languages. Static analysis only, so the same code always produces the same map. Also ships a CI gate that fails a PR on a new dependency cycle, a new body-confirmed duplication, or a symbol that lost every caller. Zero required dependencies; runs locally and reads code, never executes it.
+- <img src="https://codeweb-hq.github.io/codeweb/assets/favicon.svg" height="14" /> [GhostlyGawd/codeweb](https://github.com/GhostlyGawd/codeweb) - Deterministic call/import graph over a repository, exposed as 28 tools for impact, callers, duplication, dead code, and hotspots across 13 languages. Static analysis only, so the same code always produces the same map. Also ships a CI gate that fails a PR on a new dependency cycle, a new body-confirmed duplication, or a symbol that lost every caller. Zero required dependencies; runs locally and reads code, never executes it.
 ```
 
 ---
@@ -138,7 +138,7 @@ with these values.
 | Marketplace manifest | `.claude-plugin/marketplace.json` (repo root) |
 | Version | `0.14.0` (the released tag; `npm view @ghostlygawd/codeweb version` is the source of truth) |
 | License | MIT |
-| Homepage | `https://ghostlygawd.github.io/codeweb/` |
+| Homepage | `https://codeweb-hq.github.io/codeweb/` |
 
 **Description** (matches `.claude-plugin/plugin.json`, so the listing and the manifest agree):
 

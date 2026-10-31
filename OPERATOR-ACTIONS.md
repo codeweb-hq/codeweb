@@ -58,7 +58,7 @@ schedule. Search Console adds a dashboard for queries, impressions, and index st
 your Google account to enable the dashboard:
 
 1. https://search.google.com/search-console → **Add property** → *URL prefix* →
-   `https://ghostlygawd.github.io/codeweb/`
+   `https://codeweb-hq.github.io/codeweb/`
 2. Verify by **HTML tag** → send the `content="..."` token to an agent (one-line addition to the
    site head template), or use any other method you already have.
 3. **Sitemaps** → submit `sitemap.xml`.

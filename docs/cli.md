@@ -139,7 +139,7 @@ confidence or whole-repository completeness score is inferred from these signals
 
 **Available in Codeweb 0.15.0 and later:** `baseline:true`, `--baseline`, diff
 `refresh:true` / `--refresh`, and the analysis fields below. For an installed-binary
-example, use the [npm quickstart](https://ghostlygawd.github.io/codeweb/start.html#npm-quickstart).
+example, use the [npm quickstart](https://codeweb-hq.github.io/codeweb/start.html#npm-quickstart).
 
 CLI examples in this section run from the Codeweb checkout. For another target, pass
 its absolute `.codeweb/graph.json` path instead of the relative example.
