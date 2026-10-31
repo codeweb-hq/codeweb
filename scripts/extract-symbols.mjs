@@ -73,7 +73,7 @@ export const EXTRACTION_MANIFESTS = Object.freeze(['package.json', 'Cargo.toml',
 // what EXISTING C++ files resolve to, because a quoted `#include "x.h"` had no candidate before.
 // v21: COD-9 cached declaration diagnostics; invalidate unqualified old caches.
 // v22: multiline control-head regex masking in diagnostic scanning.
-const SCANNER_VERSION = 24; // aligned JSX definitions, lexical scopes, callable aliases and export surfaces.
+const SCANNER_VERSION = 25; // Python async def symbols (issue #104); builds on aligned JSX definitions, lexical scopes, callable aliases and export surfaces.
 // the bare-name fallback excludes closure-local targets (closureLocalIds), and symbolSig annotates
 // eligibility so a nesting flip invalidates cached edges. A previous-version cache is discarded at
 // load (one cold rebuild, never a crash) — the read gate below only accepts an exact version match.

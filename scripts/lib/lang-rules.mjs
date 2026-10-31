@@ -35,7 +35,7 @@ export function scanSymbols(file, text, masked) {
   if (ext === '.py') {
     lines.forEach((ln, i) => {
       let m;
-      if ((m = /^\s*def\s+([A-Za-z_]\w*)/.exec(ln))) push(m[1], i, /^\S/.test(ln) ? 'function' : 'method', true);
+      if ((m = /^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)/.exec(ln))) push(m[1], i, /^\S/.test(ln) ? 'function' : 'method', true);
       else if ((m = /^\s*class\s+([A-Za-z_]\w*)/.exec(ln))) push(m[1], i, 'class', true);
     });
   } else if (ext === '.rs') {
